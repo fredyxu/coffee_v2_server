@@ -8,3 +8,4 @@ build/
 dist/
 .air.toml
 build.sh
+deploy
