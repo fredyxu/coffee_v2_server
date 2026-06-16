@@ -9,3 +9,4 @@ dist/
 .air.toml
 build.sh
 deploy
+host_conf
