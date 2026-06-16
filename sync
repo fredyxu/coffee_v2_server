@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "${ROOT_DIR}"
+
+GITEE_REMOTE_NAME="origin"
+GITEE_REMOTE_URL="git@gitee.com:FredyXu/coffee_v2_server.git"
+GITHUB_REMOTE_NAME="github"
+GITHUB_REMOTE_URL="git@github.com:fredyxu/coffee_v2_server.git"
+
+branch="$(git symbolic-ref --quiet --short HEAD || echo main)"
+msg="${1:-$(date '+%Y-%m-%d %H:%M:%S')}"
+
+ensure_remote() {
+  local name="$1"
+  local url="$2"
+
+  if git remote get-url "${name}" >/dev/null 2>&1; then
+    local current_url
+    current_url="$(git remote get-url "${name}")"
+    if [[ "${current_url}" != "${url}" ]]; then
+      echo "[sync] updating ${name} remote: ${current_url} -> ${url}"
+      git remote set-url "${name}" "${url}"
+    fi
+    return
+  fi
+
+  echo "[sync] adding ${name} remote: ${url}"
+  git remote add "${name}" "${url}"
+}
+
+ensure_remote "${GITEE_REMOTE_NAME}" "${GITEE_REMOTE_URL}"
+ensure_remote "${GITHUB_REMOTE_NAME}" "${GITHUB_REMOTE_URL}"
+
+ignored_tracked=()
+while IFS= read -r -d '' path; do
+  ignored_tracked+=("${path}")
+done < <(git ls-files -ci --exclude-standard -z)
+
+if [[ "${#ignored_tracked[@]}" -gt 0 ]]; then
+  echo "[sync] untracking ignored paths from git index..."
+  git rm -r --cached -- "${ignored_tracked[@]}"
+fi
+
+git add -A
+
+if ! git diff --cached --quiet; then
+  git commit -m "${msg}"
+else
+  echo "[sync] no staged changes to commit"
+fi
+
+git push -u "${GITEE_REMOTE_NAME}" "${branch}"
+git push "${GITHUB_REMOTE_NAME}" "${branch}"
+
+echo "[sync] done on branch ${branch}"

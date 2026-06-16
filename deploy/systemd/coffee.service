@@ -1,0 +1,15 @@
+[Unit]
+Description=Coffee Project Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/zclub/coffee/coffee_server
+ExecStart=/zclub/coffee/coffee_server/bin/coffee_server
+Restart=always
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target

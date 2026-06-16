@@ -1,0 +1,5 @@
+config/secret.go
+.cache/
+.DS_Store
+.vscode/
+bin/
