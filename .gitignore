@@ -3,3 +3,6 @@ config/secret.go
 .DS_Store
 .vscode/
 bin/
+
+build/
+dist/
