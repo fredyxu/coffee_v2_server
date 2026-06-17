@@ -2,6 +2,7 @@ package ws
 
 import (
 	"bytes"
+	"encoding/json"
 	"log"
 	"time"
 
@@ -10,8 +11,8 @@ import (
 
 const (
 	writeWait      = 10 * time.Second
-	pongWait       = 60 * time.Second
-	pingPeriod     = (pongWait * 9) / 10
+	pongWait       = 180 * time.Second
+	pingPeriod     = 30 * time.Second
 	maxMessageSize = 64 * 1024
 )
 
@@ -29,6 +30,14 @@ type Client struct {
 type outboundMessage struct {
 	messageType int
 	data        []byte
+}
+
+type keepaliveMessage struct {
+	Type string `json:"type"`
+}
+
+type messageMetadata struct {
+	Room string `json:"room"`
 }
 
 func newClient(hub *Hub, conn *websocket.Conn, deviceID string, room string) *Client {
@@ -66,14 +75,68 @@ func (c *Client) readPump() {
 			continue
 		}
 
+		_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
 		message = bytes.TrimSpace(bytes.ReplaceAll(message, newline, space))
+		if messageType == websocket.TextMessage && c.handleKeepalive(message) {
+			continue
+		}
+		room := c.room
+		if messageType == websocket.TextMessage {
+			room = c.messageRoom(message)
+		}
+
 		c.hub.broadcast <- envelope{
 			sender:      c,
 			messageType: messageType,
-			room:        c.room,
+			room:        room,
 			data:        message,
 		}
 	}
+}
+
+func (c *Client) messageRoom(message []byte) string {
+	var metadata messageMetadata
+	if err := json.Unmarshal(message, &metadata); err != nil || metadata.Room == "" {
+		return c.room
+	}
+	return metadata.Room
+}
+
+func (c *Client) handleKeepalive(message []byte) bool {
+	var keepalive keepaliveMessage
+	if err := json.Unmarshal(message, &keepalive); err != nil {
+		return false
+	}
+
+	responseType := ""
+	switch keepalive.Type {
+	case "ping":
+		responseType = "pong"
+	case "heartbeat":
+		responseType = "heartbeat_ack"
+	default:
+		return false
+	}
+
+	var ack map[string]any
+	if err := json.Unmarshal(message, &ack); err != nil {
+		ack = make(map[string]any)
+	}
+	ack["type"] = responseType
+	ack["server_time_utc"] = time.Now().UTC().Format(time.RFC3339)
+
+	payload, err := json.Marshal(ack)
+	if err != nil {
+		return true
+	}
+
+	select {
+	case c.send <- outboundMessage{messageType: websocket.TextMessage, data: payload}:
+	default:
+		log.Printf("websocket keepalive response dropped: device_id=%s room=%s type=%s", c.deviceID, c.room, responseType)
+	}
+
+	return true
 }
 
 func (c *Client) writePump() {

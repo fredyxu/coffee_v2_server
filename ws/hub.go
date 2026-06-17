@@ -48,7 +48,7 @@ func (h *Hub) Run() {
 
 			h.mu.RLock()
 			for client := range h.clients {
-				if client == msg.sender || client.room != msg.room {
+				if client.room != msg.room {
 					continue
 				}
 
