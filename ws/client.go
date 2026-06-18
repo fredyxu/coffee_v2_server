@@ -84,12 +84,16 @@ func (c *Client) readPump() {
 		if messageType == websocket.TextMessage {
 			room = c.messageRoom(message)
 		}
+		now := time.Now().In(messageDatetimeLocation)
 
 		c.hub.broadcast <- envelope{
 			sender:      c,
+			senderID:    c.deviceID,
 			messageType: messageType,
 			room:        room,
 			data:        message,
+			date:        now.Format(messageDateLayout),
+			time:        now.Format(messageTimeLayout),
 		}
 	}
 }

@@ -1,12 +1,30 @@
 package ws
 
-import "sync"
+import (
+	"encoding/json"
+	"sync"
+	"time"
+
+	"github.com/gorilla/websocket"
+)
+
+const (
+	messageDateLayout = "2006-01-02"
+	messageTimeLayout = "15:04:05"
+	defaultRole       = "member"
+	defaultLevel      = 0
+)
+
+var messageDatetimeLocation = time.FixedZone("Asia/Shanghai", 8*60*60)
 
 type envelope struct {
 	sender      *Client
+	senderID    string
 	messageType int
 	room        string
 	data        []byte
+	date        string
+	time        string
 }
 
 type Hub struct {
@@ -52,8 +70,9 @@ func (h *Hub) Run() {
 					continue
 				}
 
+				data := msg.dataFor(client)
 				select {
-				case client.send <- outboundMessage{messageType: msg.messageType, data: msg.data}:
+				case client.send <- outboundMessage{messageType: msg.messageType, data: data}:
 				default:
 					stale = append(stale, client)
 				}
@@ -72,6 +91,34 @@ func (h *Hub) Run() {
 			}
 		}
 	}
+}
+
+func (msg envelope) dataFor(client *Client) []byte {
+	if msg.messageType != websocket.TextMessage {
+		return msg.data
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(msg.data, &payload); err != nil {
+		return msg.data
+	}
+
+	if client == msg.sender {
+		payload["from"] = "self"
+	} else {
+		payload["from"] = "other"
+	}
+	payload["sender_id"] = msg.senderID
+	payload["date"] = msg.date
+	payload["time"] = msg.time
+	payload["role"] = defaultRole
+	payload["level"] = defaultLevel
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return msg.data
+	}
+	return data
 }
 
 func (h *Hub) ClientCount() int {
