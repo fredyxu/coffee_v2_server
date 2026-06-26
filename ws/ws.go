@@ -36,14 +36,13 @@ func handleWebSocket(hub *Hub, cfg config.Config) http.HandlerFunc {
 
 		deviceID := r.URL.Query().Get("device_id")
 		room := r.URL.Query().Get("room")
-		if room == "" {
-			room = "default"
-		}
+		callsign := r.URL.Query().Get("callsign")
+		fwVersion := r.URL.Query().Get("fw_version")
 
-		client := newClient(hub, conn, deviceID, room)
+		client := newClient(hub, conn, deviceID, room, callsign, fwVersion)
 		hub.register <- client
 
-		log.Printf("websocket connected: device_id=%s room=%s remote=%s", deviceID, room, r.RemoteAddr)
+		log.Printf("websocket connected: device_id=%s callsign=%s room=%s fw_version=%s remote=%s", client.deviceID, client.callsign, client.room, client.fwVersion, r.RemoteAddr)
 
 		go client.writePump()
 		client.readPump()

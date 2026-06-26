@@ -1,0 +1,1098 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Coffee PTT Test</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --panel: #fff;
+      --line: #d7dee6;
+      --text: #1f2933;
+      --muted: #64748b;
+      --blue: #1363df;
+      --green: #15803d;
+      --red: #b42318;
+      --amber: #b45309;
+      --log: #111827;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 22px;
+    }
+    h1 {
+      font-size: 22px;
+      margin: 0;
+    }
+    h2 {
+      font-size: 15px;
+      margin: 0 0 12px;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .title-block {
+      display: grid;
+      gap: 4px;
+    }
+    .build-info {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .build-info b {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border-radius: 999px;
+      padding: 2px 10px;
+      background: #e2e8f0;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge.ok {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .badge.warn {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .badge.err {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .two {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 14px;
+    }
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    input {
+      height: 36px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 0 10px;
+      font-size: 14px;
+      color: var(--text);
+      background: #fff;
+    }
+    button {
+      height: 36px;
+      border: 1px solid #94a3b8;
+      border-radius: 6px;
+      background: #fff;
+      padding: 0 13px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button.primary {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #fff;
+    }
+    button.danger {
+      border-color: #fca5a5;
+      color: var(--red);
+    }
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    .kv {
+      display: grid;
+      grid-template-columns: 140px minmax(0, 1fr);
+      gap: 8px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .kv b {
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .kv span {
+      min-width: 0;
+      word-break: break-word;
+      font-variant-numeric: tabular-nums;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fbfcfd;
+      min-height: 72px;
+    }
+    .stat b {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .stat span {
+      display: block;
+      margin-top: 7px;
+      font-size: 20px;
+      font-variant-numeric: tabular-nums;
+      word-break: break-word;
+    }
+    .stat small {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .ok-text {
+      color: var(--green);
+    }
+    .warn-text {
+      color: var(--amber);
+    }
+    .err-text {
+      color: var(--red);
+    }
+    pre {
+      height: 340px;
+      overflow: auto;
+      margin: 0;
+      padding: 12px;
+      background: var(--log);
+      color: #e5e7eb;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .log-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    @media (max-width: 920px) {
+      .grid,
+      .two,
+      .stats {
+        grid-template-columns: 1fr;
+      }
+      main {
+        padding: 14px;
+      }
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="topbar">
+      <div class="title-block">
+        <h1>Coffee PTT Test</h1>
+        <div class="build-info">
+          <span>Page version <b id="pageVersion">ptt-g711-20260625-113718</b></span>
+          <span>Page modified <b id="pageModifiedAt">2026-06-25 11:37:18 CST</b></span>
+          <span>Server runtime <b id="serverRuntimeVersion">__SERVER_RUNTIME_VERSION__</b></span>
+          <span>Runtime modified <b id="serverRuntimeModifiedAt">__SERVER_RUNTIME_MODIFIED_AT__</b></span>
+          <span>Audio parser <b id="audioParserVersion">__AUDIO_PARSER_VERSION__</b></span>
+        </div>
+      </div>
+      <span id="statusBadge" class="badge">Disconnected</span>
+    </div>
+
+    <section class="panel">
+      <h2>Connection</h2>
+      <div class="grid">
+        <label>
+          Server URL
+          <input id="serverUrl" value="wss://coffee.zclub.cool/ws">
+        </label>
+        <label>
+          Token
+          <input id="token" value="zclub-coffee-v2">
+        </label>
+        <label>
+          Room
+          <input id="room" value="default">
+        </label>
+        <label>
+          Callsign
+          <input id="callsign" value="Browser">
+        </label>
+        <label>
+          Device ID
+          <input id="deviceId" value="browser-listener">
+        </label>
+        <label>
+          FW Version
+          <input id="fwVersion" value="browser-test">
+        </label>
+      </div>
+      <div class="actions">
+        <button id="unlockAudio">Unlock audio</button>
+        <button id="connect" class="primary">Connect</button>
+        <button id="disconnect" disabled>Disconnect</button>
+        <button id="sendPing" disabled>Send ping</button>
+        <span id="audioState" class="muted">Audio locked</span>
+      </div>
+    </section>
+
+    <section class="two">
+      <div class="panel">
+        <h2>Session</h2>
+        <div class="kv">
+          <b>WebSocket</b><span id="wsState">Disconnected</span>
+          <b>Connected at</b><span id="connectedAt">-</span>
+          <b>Duration</b><span id="duration">-</span>
+          <b>Current URL</b><span id="currentUrl">-</span>
+          <b>Last close</b><span id="lastClose">-</span>
+          <b>Last message</b><span id="lastMessage">-</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>PTT Signal</h2>
+        <div class="kv">
+          <b>Room</b><span id="signalRoom">-</span>
+          <b>Speaker</b><span id="speaker">-</span>
+          <b>Talking</b><span id="talking">false</span>
+          <b>Last start ack</b><span id="startAck">-</span>
+          <b>Last pong</b><span id="lastPong">-</span>
+          <b>JSON messages</b><span id="jsonCount">0</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Server Audio Diagnostics</h2>
+      <div class="stats">
+        <div class="stat"><b>Room</b><span id="serverRoom">-</span><small>reported by server</small></div>
+        <div class="stat"><b>Speaker</b><span id="serverSpeaker">-</span><small id="serverSpeakerDevice">device -</small></div>
+        <div class="stat"><b>Listeners</b><span id="serverListeners">0</span><small>same room excluding speaker</small></div>
+        <div class="stat"><b>Inbound / valid</b><span id="serverInboundValid">0 / 0</span><small>binary parsed on server</small></div>
+        <div class="stat"><b>Forwarded / dropped</b><span id="serverForwardedDropped">0 / 0</span><small>server routing result</small></div>
+        <div class="stat"><b>Receive ratio</b><span id="serverRatio">-</span><small>forwarded / expected</small></div>
+        <div class="stat"><b>First audio</b><span id="serverFirstAudioDelay">-</span><small>server delay after talking=true</small></div>
+        <div class="stat"><b>Last seq</b><span id="serverLastSeq">-</span><small id="serverSeqGaps">seq gaps 0</small></div>
+        <div class="stat"><b>Last drop</b><span id="serverLastDrop">-</span><small>reason from server</small></div>
+        <div class="stat"><b>Segment</b><span id="serverSegment">-</span><small id="serverDuration">duration -</small></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Browser Audio Frames</h2>
+      <div class="stats">
+        <div class="stat"><b>Frames</b><span id="frames">0</span><small>valid binary</small></div>
+        <div class="stat"><b>Bytes</b><span id="bytesTotal">0</span><small>audio payload + header</small></div>
+        <div class="stat"><b>Invalid frames</b><span id="invalidFrames">0</span><small>header or PCM error</small></div>
+        <div class="stat"><b>Seq gaps</b><span id="seqGaps">0</span><small>missing or out of order</small></div>
+        <div class="stat"><b>First audio</b><span id="firstAudioDelay">-</span><small>after talking=true</small></div>
+        <div class="stat"><b>Receive ratio</b><span id="segmentRatio">-</span><small>actual / expected</small></div>
+        <div class="stat"><b>Seq</b><span id="seq">-</span><small id="seqState">waiting</small></div>
+        <div class="stat"><b>Samples</b><span id="samples">-</span><small>expected 160-320</small></div>
+        <div class="stat"><b>Sample rate</b><span id="sampleRate">-</span><small>expected 8000</small></div>
+        <div class="stat"><b>Payload</b><span id="payloadBytes">-</span><small>expected by codec</small></div>
+        <div class="stat"><b>Rate</b><span id="frameRate">0/s</span><small id="audioGap">no audio</small></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Talk Segment</h2>
+      <div class="stats">
+        <div class="stat"><b>Segment</b><span id="segmentId">0</span><small>increments on talking=true</small></div>
+        <div class="stat"><b>Segment frames</b><span id="segmentFrames">0</span><small id="segmentExpected">expected while talking</small></div>
+        <div class="stat"><b>Segment duration</b><span id="segmentDuration">-</span><small>talking true to false</small></div>
+        <div class="stat"><b>Stop summary</b><span id="segmentSummary">-</span><small>last completed segment</small></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Diagnostics</h2>
+      <div class="stats">
+        <div class="stat"><b>Conclusion</b><span id="diagnosis">Waiting</span><small>server vs browser path</small></div>
+        <div class="stat"><b>Last gap</b><span id="lastFrameGap">-</span><small>between audio frames</small></div>
+        <div class="stat"><b>Audio clock</b><span id="audioClock">-</span><small>browser context</small></div>
+        <div class="stat"><b>Queue</b><span id="queueDelay">-</span><small>scheduled playback</small></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="log-actions">
+        <h2>Log</h2>
+        <div class="actions" style="margin-top: 0;">
+          <button id="clearLog">Clear log</button>
+          <button id="copyLog">Copy log</button>
+        </div>
+      </div>
+      <pre id="log"></pre>
+    </section>
+  </main>
+
+  <script>
+    const pageBuild = {
+      version: 'ptt-g711-20260625-113718',
+      modifiedAt: '2026-06-25 11:37:18 CST',
+      serverRuntimeVersion: '__SERVER_RUNTIME_VERSION__',
+      serverRuntimeModifiedAt: '__SERVER_RUNTIME_MODIFIED_AT__',
+      audioParserVersion: '__AUDIO_PARSER_VERSION__'
+    };
+
+    const els = {
+      serverUrl: document.getElementById('serverUrl'),
+      token: document.getElementById('token'),
+      room: document.getElementById('room'),
+      callsign: document.getElementById('callsign'),
+      deviceId: document.getElementById('deviceId'),
+      fwVersion: document.getElementById('fwVersion'),
+      unlockAudio: document.getElementById('unlockAudio'),
+      connect: document.getElementById('connect'),
+      disconnect: document.getElementById('disconnect'),
+      sendPing: document.getElementById('sendPing'),
+      clearLog: document.getElementById('clearLog'),
+      copyLog: document.getElementById('copyLog'),
+      statusBadge: document.getElementById('statusBadge'),
+      pageVersion: document.getElementById('pageVersion'),
+      pageModifiedAt: document.getElementById('pageModifiedAt'),
+      serverRuntimeVersion: document.getElementById('serverRuntimeVersion'),
+      serverRuntimeModifiedAt: document.getElementById('serverRuntimeModifiedAt'),
+      audioParserVersion: document.getElementById('audioParserVersion'),
+      audioState: document.getElementById('audioState'),
+      wsState: document.getElementById('wsState'),
+      connectedAt: document.getElementById('connectedAt'),
+      duration: document.getElementById('duration'),
+      currentUrl: document.getElementById('currentUrl'),
+      lastClose: document.getElementById('lastClose'),
+      lastMessage: document.getElementById('lastMessage'),
+      signalRoom: document.getElementById('signalRoom'),
+      speaker: document.getElementById('speaker'),
+      talking: document.getElementById('talking'),
+      startAck: document.getElementById('startAck'),
+      lastPong: document.getElementById('lastPong'),
+      jsonCount: document.getElementById('jsonCount'),
+      serverRoom: document.getElementById('serverRoom'),
+      serverSpeaker: document.getElementById('serverSpeaker'),
+      serverSpeakerDevice: document.getElementById('serverSpeakerDevice'),
+      serverListeners: document.getElementById('serverListeners'),
+      serverInboundValid: document.getElementById('serverInboundValid'),
+      serverForwardedDropped: document.getElementById('serverForwardedDropped'),
+      serverRatio: document.getElementById('serverRatio'),
+      serverFirstAudioDelay: document.getElementById('serverFirstAudioDelay'),
+      serverLastSeq: document.getElementById('serverLastSeq'),
+      serverSeqGaps: document.getElementById('serverSeqGaps'),
+      serverLastDrop: document.getElementById('serverLastDrop'),
+      serverSegment: document.getElementById('serverSegment'),
+      serverDuration: document.getElementById('serverDuration'),
+      diagnosis: document.getElementById('diagnosis'),
+      frames: document.getElementById('frames'),
+      segmentId: document.getElementById('segmentId'),
+      segmentFrames: document.getElementById('segmentFrames'),
+      segmentExpected: document.getElementById('segmentExpected'),
+      segmentRatio: document.getElementById('segmentRatio'),
+      firstAudioDelay: document.getElementById('firstAudioDelay'),
+      segmentDuration: document.getElementById('segmentDuration'),
+      segmentSummary: document.getElementById('segmentSummary'),
+      seq: document.getElementById('seq'),
+      seqState: document.getElementById('seqState'),
+      samples: document.getElementById('samples'),
+      sampleRate: document.getElementById('sampleRate'),
+      payloadBytes: document.getElementById('payloadBytes'),
+      frameRate: document.getElementById('frameRate'),
+      audioGap: document.getElementById('audioGap'),
+      bytesTotal: document.getElementById('bytesTotal'),
+      invalidFrames: document.getElementById('invalidFrames'),
+      seqGaps: document.getElementById('seqGaps'),
+      lastFrameGap: document.getElementById('lastFrameGap'),
+      audioClock: document.getElementById('audioClock'),
+      queueDelay: document.getElementById('queueDelay'),
+      log: document.getElementById('log')
+    };
+
+    const expected = {
+      minSamples: 160,
+      maxSamples: 320,
+      sampleRate: 8000
+    };
+
+    const state = {
+      ws: null,
+      audioContext: null,
+      nextPlayTime: 0,
+      connectedAt: 0,
+      frameCount: 0,
+      jsonCount: 0,
+      invalidFrames: 0,
+      seqGaps: 0,
+      bytesTotal: 0,
+      lastSeq: null,
+      lastFrameAt: 0,
+      frameWindow: [],
+      segmentId: 0,
+      segmentActive: false,
+      segmentStartedAt: 0,
+      segmentFrames: 0,
+      segmentFirstAudioAt: 0,
+      segmentSpeaker: '',
+      segmentRoom: '',
+      serverDiag: null,
+      lastServerDropLog: '',
+      timer: null
+    };
+
+    function nowTime() {
+      return new Date().toLocaleTimeString();
+    }
+
+    function setStatus(text, level) {
+      els.statusBadge.textContent = text;
+      els.statusBadge.className = `badge ${level || ''}`.trim();
+      els.wsState.textContent = text;
+    }
+
+    function log(level, message, value) {
+      const suffix = value === undefined ? '' : ` ${typeof value === 'string' ? value : JSON.stringify(value)}`;
+      els.log.textContent += `[${nowTime()}] [${level}] ${message}${suffix}\n`;
+      els.log.scrollTop = els.log.scrollHeight;
+    }
+
+    function sanitizeUrlForLog(url) {
+      const copy = new URL(url);
+      if (copy.searchParams.has('token')) {
+        copy.searchParams.set('token', '***');
+      }
+      return copy.toString();
+    }
+
+    function buildUrl() {
+      const url = new URL(els.serverUrl.value);
+      url.searchParams.set('token', els.token.value);
+      url.searchParams.set('room', els.room.value || 'default');
+      url.searchParams.set('callsign', els.callsign.value || 'Browser');
+      url.searchParams.set('device_id', els.deviceId.value || 'browser-listener');
+      url.searchParams.set('fw_version', els.fwVersion.value || 'browser-test');
+      return url.toString();
+    }
+
+    function resetCounters() {
+      state.nextPlayTime = 0;
+      state.frameCount = 0;
+      state.jsonCount = 0;
+      state.invalidFrames = 0;
+      state.seqGaps = 0;
+      state.bytesTotal = 0;
+      state.lastSeq = null;
+      state.lastFrameAt = 0;
+      state.frameWindow = [];
+      state.segmentId = 0;
+      state.segmentActive = false;
+      state.segmentStartedAt = 0;
+      state.segmentFrames = 0;
+      state.segmentFirstAudioAt = 0;
+      state.segmentSpeaker = '';
+      state.segmentRoom = '';
+      state.serverDiag = null;
+      state.lastServerDropLog = '';
+      els.serverRoom.textContent = '-';
+      els.serverSpeaker.textContent = '-';
+      els.serverSpeakerDevice.textContent = 'device -';
+      els.serverListeners.textContent = '0';
+      els.serverInboundValid.textContent = '0 / 0';
+      els.serverForwardedDropped.textContent = '0 / 0';
+      els.serverRatio.textContent = '-';
+      els.serverRatio.className = '';
+      els.serverFirstAudioDelay.textContent = '-';
+      els.serverFirstAudioDelay.className = '';
+      els.serverLastSeq.textContent = '-';
+      els.serverSeqGaps.textContent = 'seq gaps 0';
+      els.serverLastDrop.textContent = '-';
+      els.serverLastDrop.className = '';
+      els.serverSegment.textContent = '-';
+      els.serverDuration.textContent = 'duration -';
+      els.diagnosis.textContent = 'Waiting';
+      els.diagnosis.className = '';
+      els.frames.textContent = '0';
+      els.segmentId.textContent = '0';
+      els.segmentFrames.textContent = '0';
+      els.segmentExpected.textContent = 'expected while talking';
+      els.segmentRatio.textContent = '-';
+      els.firstAudioDelay.textContent = '-';
+      els.segmentDuration.textContent = '-';
+      els.segmentSummary.textContent = '-';
+      els.seq.textContent = '-';
+      els.seqState.textContent = 'waiting';
+      els.seqState.className = '';
+      els.samples.textContent = '-';
+      els.sampleRate.textContent = '-';
+      els.payloadBytes.textContent = '-';
+      els.frameRate.textContent = '0/s';
+      els.audioGap.textContent = 'no audio';
+      els.bytesTotal.textContent = '0';
+      els.invalidFrames.textContent = '0';
+      els.seqGaps.textContent = '0';
+      els.lastFrameGap.textContent = '-';
+      els.queueDelay.textContent = '-';
+      els.jsonCount.textContent = '0';
+      els.lastMessage.textContent = '-';
+      els.signalRoom.textContent = els.room.value || 'default';
+      els.speaker.textContent = '-';
+      els.talking.textContent = 'false';
+      els.startAck.textContent = '-';
+      els.lastPong.textContent = '-';
+    }
+
+    function expectedFramesForElapsed(elapsedMs) {
+      return Math.max(0, Math.floor(elapsedMs / 20));
+    }
+
+    function formatPercent(numerator, denominator) {
+      if (!denominator || denominator <= 0) {
+        return '-';
+      }
+      return `${Math.round((numerator / denominator) * 100)}%`;
+    }
+
+    function updateDiagnosis() {
+      const server = state.serverDiag;
+      if (!server) {
+        els.diagnosis.textContent = 'Waiting';
+        els.diagnosis.className = '';
+        return;
+      }
+
+      const inbound = Number(server.inbound_binary_frames || 0);
+      const forwarded = Number(server.forwarded_frames || 0);
+      const browserFrames = state.segmentFrames;
+      if (inbound === 0) {
+        els.diagnosis.textContent = 'ESP32 not reaching server';
+        els.diagnosis.className = 'err-text';
+      } else if (forwarded === 0) {
+        els.diagnosis.textContent = 'Server received but did not forward';
+        els.diagnosis.className = 'err-text';
+      } else if (browserFrames === 0) {
+        els.diagnosis.textContent = 'Server-to-browser or browser receive issue';
+        els.diagnosis.className = 'warn-text';
+      } else {
+        els.diagnosis.textContent = 'Audio path OK; check PCM playback or volume';
+        els.diagnosis.className = 'ok-text';
+      }
+    }
+
+    function updateServerDiagnostics(msg) {
+      state.serverDiag = msg;
+      const expectedFrames = Number(msg.expected_frames || 0);
+      const forwarded = Number(msg.forwarded_frames || 0);
+      const ratio = expectedFrames > 0 ? forwarded / expectedFrames : 0;
+      els.serverRoom.textContent = msg.room || '-';
+      els.serverSpeaker.textContent = msg.speaker_callsign || '-';
+      els.serverSpeakerDevice.textContent = `device ${msg.speaker_device_id || '-'}`;
+      els.serverListeners.textContent = msg.listener_count ?? 0;
+      els.serverInboundValid.textContent = `${msg.inbound_binary_frames || 0} / ${msg.valid_audio_frames || 0}`;
+      els.serverForwardedDropped.textContent = `${msg.forwarded_frames || 0} / ${msg.dropped_frames || 0}`;
+      els.serverRatio.textContent = formatPercent(forwarded, expectedFrames);
+      els.serverRatio.className = expectedFrames > 0 && ratio >= 0.8 ? 'ok-text' : 'warn-text';
+      els.serverFirstAudioDelay.textContent = msg.first_audio_delay_ms === null || msg.first_audio_delay_ms === undefined ? '-' : `${msg.first_audio_delay_ms}ms`;
+      els.serverFirstAudioDelay.className = msg.first_audio_delay_ms !== null && msg.first_audio_delay_ms !== undefined && msg.first_audio_delay_ms <= 200 ? 'ok-text' : 'warn-text';
+      els.serverLastSeq.textContent = msg.last_seq ?? '-';
+      els.serverSeqGaps.textContent = `seq gaps ${msg.seq_gaps || 0}`;
+      els.serverLastDrop.textContent = msg.last_drop_reason || '-';
+      els.serverLastDrop.className = msg.dropped_frames > 0 ? 'warn-text' : '';
+      els.serverSegment.textContent = msg.segment_id || '-';
+      els.serverDuration.textContent = `duration ${msg.duration_ms || 0}ms`;
+      updateDiagnosis();
+
+      if (msg.event === 'segment_start') {
+        log('SERVER_SEGMENT_START', 'server segment started', msg);
+      } else if (msg.event === 'summary') {
+        log('SERVER_AUDIO_SUMMARY', 'server segment summary', msg);
+        if (msg.last_drop_reason && msg.last_drop_reason !== 'none' && state.lastServerDropLog !== msg.last_drop_reason) {
+          state.lastServerDropLog = msg.last_drop_reason;
+          log('SERVER_AUDIO_DROP', 'server drop reason at segment end', msg);
+        }
+      } else if (msg.event === 'audio_drop' && state.lastServerDropLog !== msg.last_drop_reason) {
+        state.lastServerDropLog = msg.last_drop_reason || '';
+        log('SERVER_AUDIO_DROP', 'server audio drop', msg);
+      }
+    }
+
+    function resetSeqForSegment() {
+      state.lastSeq = null;
+      els.seq.textContent = '-';
+      els.seqState.textContent = 'waiting for first segment frame';
+      els.seqState.className = '';
+    }
+
+    function beginTalkSegment(msg) {
+      state.segmentId += 1;
+      state.segmentActive = true;
+      state.segmentStartedAt = performance.now();
+      state.segmentFrames = 0;
+      state.segmentFirstAudioAt = 0;
+      state.segmentSpeaker = msg.callsign || '-';
+      state.segmentRoom = msg.room || '-';
+      state.lastServerDropLog = '';
+      state.frameWindow = [];
+      resetSeqForSegment();
+      els.segmentId.textContent = state.segmentId;
+      els.segmentFrames.textContent = '0';
+      els.segmentExpected.textContent = 'expected 0';
+      els.segmentRatio.textContent = '-';
+      els.firstAudioDelay.textContent = 'waiting';
+      els.firstAudioDelay.className = 'warn-text';
+      els.segmentDuration.textContent = 'running';
+      els.segmentSummary.textContent = '-';
+      els.audioGap.textContent = 'waiting audio';
+      els.audioGap.className = 'warn-text';
+      log('SEGMENT', 'talk started, seq checker reset', {
+        segment: state.segmentId,
+        room: state.segmentRoom,
+        speaker: state.segmentSpeaker,
+        expected_rate: '50 frames/s',
+        expected_frame: '20-40ms, 12-byte header + PCM16/u-law payload'
+      });
+    }
+
+    function finishTalkSegment(msg) {
+      if (!state.segmentActive) {
+        log('SIGNAL', 'talk stop received without active segment', msg);
+        return;
+      }
+      const elapsedMs = performance.now() - state.segmentStartedAt;
+      const expectedFrames = expectedFramesForElapsed(elapsedMs);
+      const ratio = expectedFrames > 0 ? state.segmentFrames / expectedFrames : 0;
+      const summary = {
+        segment: state.segmentId,
+        room: state.segmentRoom,
+        speaker: state.segmentSpeaker,
+        duration_ms: Math.round(elapsedMs),
+        frames: state.segmentFrames,
+        expected_frames: expectedFrames,
+        receive_ratio: Number(ratio.toFixed(2)),
+        first_audio_delay_ms: state.segmentFirstAudioAt ? Math.round(state.segmentFirstAudioAt - state.segmentStartedAt) : null
+      };
+      state.segmentActive = false;
+      els.segmentDuration.textContent = `${Math.round(elapsedMs)}ms`;
+      els.segmentExpected.textContent = `expected ${expectedFrames}`;
+      els.segmentRatio.textContent = expectedFrames > 0 ? `${Math.round(ratio * 100)}%` : '-';
+      els.segmentRatio.className = ratio >= 0.8 ? 'ok-text' : 'warn-text';
+      els.segmentSummary.textContent = `${state.segmentFrames}/${expectedFrames}`;
+      log('BROWSER_SUMMARY', 'browser segment summary', summary);
+      updateDiagnosis();
+    }
+
+    async function ensureAudio() {
+      if (!state.audioContext) {
+        state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (state.audioContext.state !== 'running') {
+        await state.audioContext.resume();
+      }
+      state.nextPlayTime = Math.max(state.nextPlayTime, state.audioContext.currentTime);
+      els.audioState.textContent = `Audio ${state.audioContext.state}, ${state.audioContext.sampleRate}Hz`;
+      return state.audioContext;
+    }
+
+    function parseHeader(view) {
+      if (view.byteLength < 12) {
+        throw new Error(`binary frame shorter than 12-byte header: ${view.byteLength}`);
+      }
+      const magic = String.fromCharCode(view.getUint8(0)) + String.fromCharCode(view.getUint8(1));
+      const version = view.getUint8(2);
+      const codec = view.getUint8(3);
+      const seq = view.getUint16(4, true);
+      const samples = view.getUint16(6, true);
+      const sampleRate = view.getUint32(8, true);
+      if (magic !== 'CA') {
+        throw new Error(`bad magic ${magic}`);
+      }
+      if (version !== 1) {
+        throw new Error(`unsupported version ${version}`);
+      }
+      if (codec !== 0 && codec !== 1) {
+        throw new Error(`unsupported codec ${codec}`);
+      }
+      return { magic, version, codec, seq, samples, sampleRate };
+    }
+
+    function payloadBytesForHeader(header) {
+      return header.codec === 1 ? header.samples : header.samples * 2;
+    }
+
+    function ulawToPcm16(value) {
+      const u = (~value) & 0xff;
+      const sign = u & 0x80;
+      const exponent = (u >> 4) & 0x07;
+      const mantissa = u & 0x0f;
+      let sample = ((mantissa << 3) + 0x84) << exponent;
+      sample -= 0x84;
+      return sign ? -sample : sample;
+    }
+
+    function updateSeq(header) {
+      if (state.lastSeq === null) {
+        els.seqState.textContent = 'first frame';
+        state.lastSeq = header.seq;
+        return;
+      }
+      const expectedSeq = (state.lastSeq + 1) & 0xffff;
+      if (header.seq !== expectedSeq) {
+        state.seqGaps += 1;
+        els.seqGaps.textContent = state.seqGaps;
+        els.seqState.textContent = `expected ${expectedSeq}`;
+        els.seqState.className = 'warn-text';
+        log('WARN', 'audio seq gap', { expected: expectedSeq, actual: header.seq });
+      } else {
+        els.seqState.textContent = 'continuous';
+        els.seqState.className = 'ok-text';
+      }
+      state.lastSeq = header.seq;
+    }
+
+    function validateAudioShape(header, payloadBytes) {
+      const warnings = [];
+      if (header.samples < expected.minSamples || header.samples > expected.maxSamples) {
+        warnings.push(`samples=${header.samples}`);
+      }
+      if (header.sampleRate !== expected.sampleRate) {
+        warnings.push(`sample_rate=${header.sampleRate}`);
+      }
+      if (payloadBytes !== payloadBytesForHeader(header)) {
+        warnings.push(`payload=${payloadBytes}`);
+      }
+      if (warnings.length > 0) {
+        log('WARN', 'audio frame shape differs from expected', warnings.join(', '));
+      }
+    }
+
+    async function playBinaryFrame(data) {
+      const arrayBuffer = await data.arrayBuffer();
+      const receivedAt = performance.now();
+      const view = new DataView(arrayBuffer);
+      const header = parseHeader(view);
+      const payloadBytes = arrayBuffer.byteLength - 12;
+      const availableSamples = header.codec === 1 ? payloadBytes : Math.floor(payloadBytes / 2);
+      const sampleCount = Math.min(header.samples, availableSamples);
+
+      if (sampleCount <= 0) {
+        throw new Error(`empty PCM payload: ${payloadBytes} bytes`);
+      }
+
+      validateAudioShape(header, payloadBytes);
+
+      const ctx = await ensureAudio();
+      const buffer = ctx.createBuffer(1, sampleCount, header.sampleRate);
+      const channel = buffer.getChannelData(0);
+      let peak = 0;
+      let squareSum = 0;
+      for (let i = 0; i < sampleCount; i++) {
+        const pcm = header.codec === 1 ? ulawToPcm16(view.getUint8(12 + i)) : view.getInt16(12 + i * 2, true);
+        const sample = pcm / 32768;
+        channel[i] = sample;
+        const abs = Math.abs(pcm);
+        if (abs > peak) peak = abs;
+        squareSum += sample * sample;
+      }
+      const rms = Math.sqrt(squareSum / sampleCount);
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      const startAt = Math.max(ctx.currentTime + 0.24, state.nextPlayTime);
+      source.start(startAt);
+      state.nextPlayTime = startAt + sampleCount / header.sampleRate;
+
+      if (state.lastFrameAt > 0) {
+        els.lastFrameGap.textContent = `${Math.round(receivedAt - state.lastFrameAt)}ms`;
+      }
+      state.lastFrameAt = receivedAt;
+      state.frameWindow.push(receivedAt);
+      state.frameWindow = state.frameWindow.filter(t => receivedAt - t < 1000);
+      state.frameCount += 1;
+      state.segmentFrames += state.segmentActive ? 1 : 0;
+      state.bytesTotal += arrayBuffer.byteLength;
+
+      if (state.segmentActive && state.segmentFirstAudioAt === 0) {
+        state.segmentFirstAudioAt = receivedAt;
+        const delayMs = Math.round(state.segmentFirstAudioAt - state.segmentStartedAt);
+        els.firstAudioDelay.textContent = `${delayMs}ms`;
+        els.firstAudioDelay.className = delayMs <= 200 ? 'ok-text' : 'warn-text';
+        log('BROWSER_AUDIO', 'first audio frame after talk start', {
+          segment: state.segmentId,
+          delay_ms: delayMs,
+          seq: header.seq
+        });
+      }
+
+      updateSeq(header);
+      els.seq.textContent = header.seq;
+      els.samples.textContent = header.samples;
+      els.sampleRate.textContent = header.sampleRate;
+      els.payloadBytes.textContent = payloadBytes;
+      els.frames.textContent = state.frameCount;
+      els.segmentFrames.textContent = state.segmentFrames;
+      els.bytesTotal.textContent = state.bytesTotal;
+      els.frameRate.textContent = `${state.frameWindow.length}/s`;
+      els.audioGap.textContent = 'receiving';
+      els.audioGap.className = 'ok-text';
+      els.queueDelay.textContent = `${Math.max(0, Math.round((state.nextPlayTime - ctx.currentTime) * 1000))}ms`;
+      els.lastMessage.textContent = `binary seq=${header.seq} bytes=${arrayBuffer.byteLength}`;
+      updateDiagnosis();
+
+      if (state.frameCount === 1 || state.frameCount % 50 === 0) {
+        log('AUDIO', 'browser frame received', {
+          segment: state.segmentId,
+          seq: header.seq,
+          samples: header.samples,
+          sample_rate: header.sampleRate,
+          payload_bytes: payloadBytes,
+          peak,
+          rms: Number(rms.toFixed(5)),
+          total_frames: state.frameCount,
+          segment_frames: state.segmentFrames
+        });
+      }
+    }
+
+    function handleJsonMessage(msg) {
+      state.jsonCount += 1;
+      els.jsonCount.textContent = state.jsonCount;
+      els.lastMessage.textContent = msg.type || 'json';
+
+      if (msg.type === 'intercom_audio_diag') {
+        updateServerDiagnostics(msg);
+        return;
+      }
+
+      if (msg.type === 'intercom_talking') {
+        els.signalRoom.textContent = msg.room || '-';
+        els.speaker.textContent = msg.callsign || '-';
+        els.talking.textContent = String(Boolean(msg.talking));
+        els.talking.className = msg.talking ? 'ok-text' : '';
+        if (msg.talking) {
+          beginTalkSegment(msg);
+        } else {
+          finishTalkSegment(msg);
+        }
+        log('SIGNAL', 'intercom_talking', msg);
+        return;
+      }
+
+      if (msg.type === 'intercom_talk_start_ack') {
+        els.startAck.textContent = msg.ok ? 'ok=true' : `ok=false ${msg.reason || ''}`.trim();
+        els.startAck.className = msg.ok ? 'ok-text' : 'warn-text';
+        log(msg.ok ? 'SIGNAL' : 'WARN', 'intercom_talk_start_ack', msg);
+        return;
+      }
+
+      if (msg.type === 'pong' || msg.type === 'heartbeat_ack') {
+        els.lastPong.textContent = msg.server_time_utc || nowTime();
+        log('KEEPALIVE', msg.type, msg);
+        return;
+      }
+
+      log('JSON', msg.type || 'message', msg);
+    }
+
+    function startTimer() {
+      clearInterval(state.timer);
+      state.timer = setInterval(() => {
+        if (state.connectedAt > 0) {
+          const seconds = Math.floor((Date.now() - state.connectedAt) / 1000);
+          const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
+          const ss = String(seconds % 60).padStart(2, '0');
+          els.duration.textContent = `${mm}:${ss}`;
+        }
+        if (state.audioContext) {
+          els.audioClock.textContent = `${state.audioContext.state} ${state.audioContext.currentTime.toFixed(2)}s`;
+        }
+        if (state.lastFrameAt > 0) {
+          const silentFor = performance.now() - state.lastFrameAt;
+          if (silentFor > 1200) {
+            els.audioGap.textContent = `silent ${Math.round(silentFor)}ms`;
+            els.audioGap.className = 'warn-text';
+          }
+        }
+        if (state.segmentActive) {
+          const elapsedMs = performance.now() - state.segmentStartedAt;
+          const expectedFrames = expectedFramesForElapsed(elapsedMs);
+          const ratio = expectedFrames > 0 ? state.segmentFrames / expectedFrames : 0;
+          els.segmentDuration.textContent = `${Math.round(elapsedMs)}ms`;
+          els.segmentExpected.textContent = `expected ${expectedFrames}`;
+          els.segmentRatio.textContent = expectedFrames > 0 ? `${Math.round(ratio * 100)}%` : '-';
+          els.segmentRatio.className = ratio >= 0.8 ? 'ok-text' : 'warn-text';
+
+          if (elapsedMs > 700 && state.segmentFrames === 0) {
+            els.audioGap.textContent = 'talking but no audio';
+            els.audioGap.className = 'err-text';
+          }
+        }
+      }, 500);
+    }
+
+    function connect() {
+      if (state.ws) {
+        state.ws.close();
+      }
+
+      resetCounters();
+      const url = buildUrl();
+      state.ws = new WebSocket(url);
+      state.ws.binaryType = 'blob';
+      setStatus('Connecting', 'warn');
+      els.connect.disabled = true;
+      els.disconnect.disabled = false;
+      els.sendPing.disabled = true;
+      els.currentUrl.textContent = sanitizeUrlForLog(url);
+      log('INFO', 'connecting', sanitizeUrlForLog(url));
+
+      state.ws.onopen = () => {
+        state.connectedAt = Date.now();
+        els.connectedAt.textContent = new Date(state.connectedAt).toLocaleString();
+        els.lastClose.textContent = '-';
+        els.sendPing.disabled = false;
+        setStatus('Connected', 'ok');
+        startTimer();
+        log('INFO', 'websocket connected');
+      };
+
+      state.ws.onclose = event => {
+        setStatus(`Disconnected (${event.code})`, event.code === 1000 ? '' : 'err');
+        els.connect.disabled = false;
+        els.disconnect.disabled = true;
+        els.sendPing.disabled = true;
+        els.lastClose.textContent = `code=${event.code} reason=${event.reason || '-'}`;
+        state.ws = null;
+        state.connectedAt = 0;
+        log('WARN', 'websocket closed', { code: event.code, reason: event.reason });
+      };
+
+      state.ws.onerror = () => {
+        setStatus('WebSocket error', 'err');
+        log('ERROR', 'websocket error');
+      };
+
+      state.ws.onmessage = async event => {
+        if (typeof event.data === 'string') {
+          try {
+            handleJsonMessage(JSON.parse(event.data));
+          } catch {
+            els.lastMessage.textContent = 'text';
+            log('TEXT', 'message', event.data);
+          }
+          return;
+        }
+
+        try {
+          await playBinaryFrame(event.data);
+        } catch (err) {
+          state.invalidFrames += 1;
+          els.invalidFrames.textContent = state.invalidFrames;
+          els.lastMessage.textContent = 'invalid binary';
+          log('ERROR', 'audio frame error', err.message);
+        }
+      };
+    }
+
+    els.unlockAudio.onclick = async () => {
+      try {
+        await ensureAudio();
+        log('INFO', 'audio unlocked', {
+          state: state.audioContext.state,
+          sample_rate: state.audioContext.sampleRate
+        });
+      } catch (err) {
+        log('ERROR', 'audio unlock failed', err.message);
+      }
+    };
+
+    els.connect.onclick = connect;
+    els.disconnect.onclick = () => {
+      if (state.ws) {
+        state.ws.close(1000, 'browser disconnect');
+      }
+    };
+    els.sendPing.onclick = () => {
+      if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      const payload = { type: 'ping' };
+      state.ws.send(JSON.stringify(payload));
+      log('KEEPALIVE', 'ping sent', payload);
+    };
+    els.clearLog.onclick = () => {
+      els.log.textContent = '';
+    };
+    els.copyLog.onclick = async () => {
+      await navigator.clipboard.writeText(els.log.textContent);
+      log('INFO', 'log copied');
+    };
+
+    els.pageVersion.textContent = pageBuild.version;
+    els.pageModifiedAt.textContent = pageBuild.modifiedAt;
+    els.serverRuntimeVersion.textContent = pageBuild.serverRuntimeVersion;
+    els.serverRuntimeModifiedAt.textContent = pageBuild.serverRuntimeModifiedAt;
+    els.audioParserVersion.textContent = pageBuild.audioParserVersion;
+    log('INFO', 'test page build', pageBuild);
+    resetCounters();
+    startTimer();
+  </script>
+</body>
+</html>

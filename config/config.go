@@ -2,12 +2,18 @@ package config
 
 import "time"
 
+var Mode string
+
 type Config struct {
 	Addr         string
 	Token        string
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 	IdleTimeout  time.Duration
+}
+
+func init() {
+	Mode = "debug"
 }
 
 func Load() Config {

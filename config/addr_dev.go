@@ -2,4 +2,4 @@
 
 package config
 
-const Addr = "127.0.0.1:18081"
+const Addr = "0.0.0.0:18081"
