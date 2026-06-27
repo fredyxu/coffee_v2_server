@@ -8,6 +8,7 @@ build/
 dist/
 .air.toml
 build.sh
+build.deploy.env
 deploy
 host_conf
 sync

@@ -63,6 +63,15 @@ type intercomMessage struct {
 	Callsign string `json:"callsign"`
 }
 
+type roomListMessage struct {
+	Type string `json:"type"`
+}
+
+type roomUsersMessage struct {
+	Type string `json:"type"`
+	Room string `json:"room"`
+}
+
 type audioHeader struct {
 	Magic0     byte
 	Magic1     byte
@@ -130,6 +139,12 @@ func (c *Client) readPump() {
 		if c.handleKeepalive(message) {
 			continue
 		}
+		if c.handleRoomList(message) {
+			continue
+		}
+		if c.handleRoomUsers(message) {
+			continue
+		}
 		if c.handleIntercom(message) {
 			continue
 		}
@@ -147,6 +162,60 @@ func (c *Client) readPump() {
 			date:        now.Format(messageDateLayout),
 			time:        now.Format(messageTimeLayout),
 		}
+	}
+}
+
+func (c *Client) handleRoomList(message []byte) bool {
+	var req roomListMessage
+	if err := json.Unmarshal(message, &req); err != nil {
+		return false
+	}
+	if req.Type != "room_list_req" {
+		return false
+	}
+
+	c.sendRoomListSnapshot()
+	return true
+}
+
+func (c *Client) sendRoomListSnapshot() {
+	data, err := json.Marshal(c.hub.roomListSnapshot())
+	if err != nil {
+		return
+	}
+
+	select {
+	case c.send <- outboundMessage{messageType: websocket.TextMessage, data: data}:
+	default:
+		log.Printf("room list response dropped: device_id=%s room=%s", c.deviceID, c.room)
+	}
+}
+
+func (c *Client) handleRoomUsers(message []byte) bool {
+	var req roomUsersMessage
+	if err := json.Unmarshal(message, &req); err != nil {
+		return false
+	}
+	if req.Type != "room_users_req" {
+		return false
+	}
+
+	room := normalizeRoomWithFallback(req.Room, c.room)
+	c.sendRoomUsersSnapshot(room)
+	return true
+}
+
+func (c *Client) sendRoomUsersSnapshot(room string) {
+	payload := c.hub.roomUsersSnapshot(room)
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+
+	select {
+	case c.send <- outboundMessage{messageType: websocket.TextMessage, data: data}:
+	default:
+		log.Printf("room users response dropped: device_id=%s room=%s requested_room=%s", c.deviceID, c.room, room)
 	}
 }
 

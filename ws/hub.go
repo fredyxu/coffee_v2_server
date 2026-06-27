@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -14,6 +15,11 @@ const (
 	messageTimeLayout = "15:04:05"
 	defaultRole       = "member"
 	defaultLevel      = 0
+	maxRooms          = 32
+	maxRoomUsers      = 128
+
+	speakerTimeoutCheckInterval = 5 * time.Second
+	speakerAudioIdleTimeout     = 15 * time.Second
 )
 
 var messageDatetimeLocation = time.FixedZone("Asia/Shanghai", 8*60*60)
@@ -29,8 +35,10 @@ type envelope struct {
 }
 
 type roomSpeaker struct {
-	client   *Client
-	callsign string
+	client      *Client
+	callsign    string
+	startedAt   time.Time
+	lastAudioAt time.Time
 }
 
 type intercomStartRequest struct {
@@ -95,6 +103,7 @@ type Hub struct {
 	speakers   map[string]roomSpeaker
 	audioStats map[string]*roomAudioStats
 	segmentSeq int64
+	revision   atomic.Uint64
 }
 
 func NewHub() *Hub {
@@ -112,16 +121,21 @@ func NewHub() *Hub {
 }
 
 func (h *Hub) Run() {
+	speakerTimeoutTicker := time.NewTicker(speakerTimeoutCheckInterval)
+	defer speakerTimeoutTicker.Stop()
+
 	for {
 		select {
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client] = struct{}{}
 			h.mu.Unlock()
+			h.broadcastRoomSnapshotsForChange(client.room)
 
 		case client := <-h.unregister:
 			if h.removeClient(client) {
 				h.releaseSpeakersForClient(client)
+				h.broadcastRoomSnapshotsForChange(client.room)
 			}
 
 		case msg := <-h.broadcast:
@@ -154,6 +168,9 @@ func (h *Hub) Run() {
 
 		case frame := <-h.audioFrame:
 			h.handleAudioFrame(frame)
+
+		case <-speakerTimeoutTicker.C:
+			h.releaseIdleSpeakers()
 		}
 	}
 }
@@ -163,7 +180,9 @@ func (h *Hub) handleIntercomStart(req intercomStartRequest) {
 		return
 	}
 
+	h.mu.Lock()
 	if speaker, ok := h.speakers[req.room]; ok {
+		h.mu.Unlock()
 		if speaker.client == req.client {
 			h.sendIntercomStartAck(req.client, map[string]any{
 				"type":     "intercom_talk_start_ack",
@@ -185,12 +204,19 @@ func (h *Hub) handleIntercomStart(req intercomStartRequest) {
 		return
 	}
 
-	h.speakers[req.room] = roomSpeaker{client: req.client, callsign: req.callsign}
+	now := time.Now()
+	h.speakers[req.room] = roomSpeaker{
+		client:      req.client,
+		callsign:    req.callsign,
+		startedAt:   now,
+		lastAudioAt: now,
+	}
+	h.mu.Unlock()
 	h.segmentSeq++
 	h.audioStats[req.room] = &roomAudioStats{
 		segmentID:       h.segmentSeq,
 		room:            req.room,
-		startedAt:       time.Now(),
+		startedAt:       now,
 		speakerDeviceID: req.client.deviceID,
 		speakerCallsign: req.callsign,
 		lastDropReason:  "none",
@@ -204,17 +230,22 @@ func (h *Hub) handleIntercomStart(req intercomStartRequest) {
 	})
 	h.broadcastIntercomTalking(req.room, req.callsign, true)
 	h.emitAudioDiag(req.room, "segment_start", h.audioStats[req.room], req.client)
+	h.broadcastRoomUsersSnapshot(req.room)
 }
 
 func (h *Hub) handleIntercomStop(req intercomStopRequest) {
+	h.mu.Lock()
 	speaker, ok := h.speakers[req.room]
 	if !ok || speaker.client != req.client {
+		h.mu.Unlock()
 		return
 	}
 
 	delete(h.speakers, req.room)
+	h.mu.Unlock()
 	h.logAudioSegment(req.room, speaker, "stop")
 	h.broadcastIntercomTalking(req.room, speaker.callsign, false)
+	h.broadcastRoomUsersSnapshot(req.room)
 }
 
 func (h *Hub) handleAudioFrame(frame audioFrame) {
@@ -232,8 +263,10 @@ func (h *Hub) handleAudioFrame(frame audioFrame) {
 	stats.lastPayloadLen = frame.payloadLen
 	stats.lastValid = frame.valid
 
+	h.mu.RLock()
 	speaker, ok := h.speakers[frame.room]
 	fromSpeaker := ok && speaker.client == frame.sender
+	h.mu.RUnlock()
 	var speakerClient *Client
 	if ok {
 		speakerClient = speaker.client
@@ -253,6 +286,10 @@ func (h *Hub) handleAudioFrame(frame audioFrame) {
 		h.dropAudioFrame(frame.room, stats, h.nonSpeakerDropReason(frame.sender), "sender_is_not_current_room_speaker", true, speakerClient)
 		return
 	}
+	speaker.lastAudioAt = time.Now()
+	h.mu.Lock()
+	h.speakers[frame.room] = speaker
+	h.mu.Unlock()
 
 	var stale []*Client
 	targets := 0
@@ -268,6 +305,7 @@ func (h *Hub) handleAudioFrame(frame audioFrame) {
 			targets++
 		default:
 			writeFailed = true
+			stale = append(stale, client)
 		}
 	}
 	h.mu.RUnlock()
@@ -320,6 +358,9 @@ func (h *Hub) dropAudioFrame(room string, stats *roomAudioStats, reason string, 
 }
 
 func (h *Hub) nonSpeakerDropReason(sender *Client) string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
 	for room, speaker := range h.speakers {
 		if speaker.client == sender && room != sender.room {
 			return "wrong_room"
@@ -452,8 +493,137 @@ func (h *Hub) clientCountForRoom(room string) int {
 	return count
 }
 
-func (h *Hub) listenerCountForRoom(room string) int {
+func (h *Hub) nextRevision() uint64 {
+	return h.revision.Add(1)
+}
+
+func (h *Hub) roomListSnapshot() map[string]any {
+	rooms := []map[string]any{
+		{
+			"id":         defaultRoom,
+			"name":       "大厅",
+			"user_count": h.roomUserCount(defaultRoom),
+			"locked":     false,
+		},
+	}
+	truncated := false
+	if len(rooms) > maxRooms {
+		rooms = rooms[:maxRooms]
+		truncated = true
+	}
+	return map[string]any{
+		"type":        "room_list",
+		"revision":    h.nextRevision(),
+		"server_time": time.Now().In(messageDatetimeLocation).Format(time.RFC3339),
+		"truncated":   truncated,
+		"rooms":       rooms,
+	}
+}
+
+func (h *Hub) roomUserCount(room string) int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	return h.clientCountForRoom(room)
+}
+
+func (h *Hub) roomUsersSnapshot(room string) map[string]any {
+	room = normalizeRoom(room)
+	users := make([]map[string]any, 0)
+	now := time.Now().In(messageDatetimeLocation).Format(time.RFC3339)
+
+	h.mu.RLock()
 	speaker, hasSpeaker := h.speakers[room]
+	for client := range h.clients {
+		if client.room != room {
+			continue
+		}
+		users = append(users, map[string]any{
+			"device_id":  client.deviceID,
+			"callsign":   client.callsign,
+			"fw_version": client.fwVersion,
+			"talking":    hasSpeaker && speaker.client == client,
+		})
+		if len(users) >= maxRoomUsers {
+			break
+		}
+	}
+	h.mu.RUnlock()
+
+	return map[string]any{
+		"type":        "room_users",
+		"room":        room,
+		"revision":    h.nextRevision(),
+		"server_time": now,
+		"truncated":   h.roomUserCount(room) > maxRoomUsers,
+		"users":       users,
+	}
+}
+
+func (h *Hub) broadcastRoomSnapshotsForChange(room string) {
+	h.broadcastRoomListSnapshot()
+	h.broadcastRoomUsersSnapshot(room)
+}
+
+func (h *Hub) broadcastRoomListSnapshot() {
+	h.broadcastJSONToAll(h.roomListSnapshot())
+}
+
+func (h *Hub) broadcastRoomUsersSnapshot(room string) {
+	h.broadcastJSONToRoom(normalizeRoom(room), h.roomUsersSnapshot(room))
+}
+
+func (h *Hub) broadcastJSONToAll(payload map[string]any) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+
+	var stale []*Client
+	h.mu.RLock()
+	for client := range h.clients {
+		select {
+		case client.send <- outboundMessage{messageType: websocket.TextMessage, data: data}:
+		default:
+			stale = append(stale, client)
+		}
+	}
+	h.mu.RUnlock()
+
+	if len(stale) > 0 {
+		h.removeStaleClients(stale)
+	}
+}
+
+func (h *Hub) broadcastJSONToRoom(room string, payload map[string]any) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+
+	var stale []*Client
+	h.mu.RLock()
+	for client := range h.clients {
+		if client.room != room {
+			continue
+		}
+		select {
+		case client.send <- outboundMessage{messageType: websocket.TextMessage, data: data}:
+		default:
+			stale = append(stale, client)
+		}
+	}
+	h.mu.RUnlock()
+
+	if len(stale) > 0 {
+		h.removeStaleClients(stale)
+	}
+}
+
+func (h *Hub) listenerCountForRoom(room string) int {
+	h.mu.RLock()
+	speaker, hasSpeaker := h.speakers[room]
+	h.mu.RUnlock()
 	var exclude *Client
 	if hasSpeaker {
 		exclude = speaker.client
@@ -463,6 +633,9 @@ func (h *Hub) listenerCountForRoom(room string) int {
 
 func (h *Hub) listenerCountForRoomExcluding(room string, exclude *Client) int {
 	count := 0
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
 	for client := range h.clients {
 		if client.room != room {
 			continue
@@ -476,15 +649,74 @@ func (h *Hub) listenerCountForRoomExcluding(room string, exclude *Client) int {
 }
 
 func (h *Hub) releaseSpeakersForClient(client *Client) {
+	type releasedSpeaker struct {
+		room    string
+		speaker roomSpeaker
+	}
+	var released []releasedSpeaker
+
+	h.mu.Lock()
 	for room, speaker := range h.speakers {
 		if speaker.client != client {
 			continue
 		}
+		released = append(released, releasedSpeaker{room: room, speaker: speaker})
+		delete(h.speakers, room)
+	}
+	h.mu.Unlock()
 
+	for _, item := range released {
+		room := item.room
+		speaker := item.speaker
 		log.Printf("intercom speaker disconnected: room=%s callsign=%s device_id=%s", room, speaker.callsign, client.deviceID)
 		h.logAudioSegment(room, speaker, "disconnect")
-		delete(h.speakers, room)
 		h.broadcastIntercomTalking(room, speaker.callsign, false)
+		h.broadcastRoomUsersSnapshot(room)
+	}
+}
+
+func (h *Hub) releaseIdleSpeakers() {
+	type releasedSpeaker struct {
+		room    string
+		reason  string
+		speaker roomSpeaker
+	}
+	var released []releasedSpeaker
+	now := time.Now()
+
+	h.mu.Lock()
+	for room, speaker := range h.speakers {
+		if _, active := h.clients[speaker.client]; !active {
+			released = append(released, releasedSpeaker{room: room, reason: "inactive", speaker: speaker})
+			delete(h.speakers, room)
+			continue
+		}
+		lastAudioAt := speaker.lastAudioAt
+		if lastAudioAt.IsZero() {
+			lastAudioAt = speaker.startedAt
+		}
+		if now.Sub(lastAudioAt) < speakerAudioIdleTimeout {
+			continue
+		}
+		released = append(released, releasedSpeaker{room: room, reason: "audio_idle_timeout", speaker: speaker})
+		delete(h.speakers, room)
+	}
+	h.mu.Unlock()
+
+	for _, item := range released {
+		switch item.reason {
+		case "inactive":
+			log.Printf("intercom speaker inactive: room=%s callsign=%s device_id=%s", item.room, item.speaker.callsign, item.speaker.client.deviceID)
+		default:
+			lastAudioAt := item.speaker.lastAudioAt
+			if lastAudioAt.IsZero() {
+				lastAudioAt = item.speaker.startedAt
+			}
+			log.Printf("intercom speaker timeout: room=%s callsign=%s device_id=%s idle=%s", item.room, item.speaker.callsign, item.speaker.client.deviceID, now.Sub(lastAudioAt).Round(time.Millisecond))
+		}
+		h.logAudioSegment(item.room, item.speaker, item.reason)
+		h.broadcastIntercomTalking(item.room, item.speaker.callsign, false)
+		h.broadcastRoomUsersSnapshot(item.room)
 	}
 }
 

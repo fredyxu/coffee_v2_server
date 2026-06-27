@@ -11,7 +11,7 @@ import (
 	"coffee_server/ws"
 )
 
-const (
+var (
 	serverRuntimeVersion    = "coffee-server-batch-ulaw-v2-20260625-113718"
 	serverRuntimeModifiedAt = "2026-06-25 11:37:18 CST"
 )
@@ -28,7 +28,11 @@ func main() {
 	go hub.Run()
 
 	mux := http.NewServeMux()
-	api.RegisterRoutes(mux, hub)
+	api.RegisterRoutes(mux, hub, api.StatusMetadata{
+		RuntimeVersion:     serverRuntimeVersion,
+		RuntimeModifiedAt:  serverRuntimeModifiedAt,
+		AudioParserVersion: ws.AudioParserVersion,
+	})
 	ws.RegisterRoutes(mux, hub, cfg)
 	mux.HandleFunc("GET /test/ptt", pttTestHandler)
 
@@ -51,5 +55,7 @@ func pttTestHandler(w http.ResponseWriter, r *http.Request) {
 	page := bytes.ReplaceAll(pttTestPage, []byte("__SERVER_RUNTIME_VERSION__"), []byte(serverRuntimeVersion))
 	page = bytes.ReplaceAll(page, []byte("__SERVER_RUNTIME_MODIFIED_AT__"), []byte(serverRuntimeModifiedAt))
 	page = bytes.ReplaceAll(page, []byte("__AUDIO_PARSER_VERSION__"), []byte(ws.AudioParserVersion))
+	page = bytes.ReplaceAll(page, []byte("__PAGE_VERSION__"), []byte(serverRuntimeVersion))
+	page = bytes.ReplaceAll(page, []byte("__PAGE_MODIFIED_AT__"), []byte(serverRuntimeModifiedAt))
 	_, _ = w.Write(page)
 }

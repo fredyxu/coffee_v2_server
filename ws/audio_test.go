@@ -2,6 +2,7 @@ package ws
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"testing"
 
 	"github.com/gorilla/websocket"
@@ -152,6 +153,129 @@ func TestClientHandleAudioFramesRejectsBadBatchLength(t *testing.T) {
 	assertAudioFrame(t, hub, 0, []byte{0}, false, "bad_batch_len")
 }
 
+func TestClientHandleRoomListRequestReturnsDefaultRoom(t *testing.T) {
+	hub := NewHub()
+	client := testClient(hub, "terminal", "default")
+	hub.clients[client] = struct{}{}
+
+	if !client.handleRoomList([]byte(`{"type":"room_list_req"}`)) {
+		t.Fatal("expected room_list_req to be handled")
+	}
+
+	select {
+	case msg := <-client.send:
+		if msg.messageType != websocket.TextMessage {
+			t.Fatalf("got message type %d, expected text", msg.messageType)
+		}
+		var payload struct {
+			Type       string `json:"type"`
+			Revision   int    `json:"revision"`
+			ServerTime string `json:"server_time"`
+			Truncated  bool   `json:"truncated"`
+			Rooms      []struct {
+				ID        string `json:"id"`
+				Name      string `json:"name"`
+				UserCount int    `json:"user_count"`
+				Locked    bool   `json:"locked"`
+			} `json:"rooms"`
+		}
+		if err := json.Unmarshal(msg.data, &payload); err != nil {
+			t.Fatalf("invalid room_list json: %v", err)
+		}
+		if payload.Type != "room_list" || payload.Revision == 0 || payload.Truncated {
+			t.Fatalf("unexpected room_list metadata: %+v", payload)
+		}
+		if payload.ServerTime == "" {
+			t.Fatal("expected server_time")
+		}
+		if len(payload.Rooms) != 1 {
+			t.Fatalf("expected 1 room, got %d", len(payload.Rooms))
+		}
+		room := payload.Rooms[0]
+		if room.ID != "default" || room.Name != "大厅" || room.UserCount != 1 || room.Locked {
+			t.Fatalf("unexpected default room: %+v", room)
+		}
+	default:
+		t.Fatal("got no room_list response")
+	}
+}
+
+func TestClientHandleRoomUsersRequestReturnsCurrentRoomUsers(t *testing.T) {
+	hub := NewHub()
+	client := testClient(hub, "terminal", "default")
+	client.callsign = "BG7YXY"
+	client.fwVersion = "coffee-v2"
+	other := testClient(hub, "other", "other")
+	hub.clients[client] = struct{}{}
+	hub.clients[other] = struct{}{}
+	hub.speakers["default"] = roomSpeaker{client: client, callsign: "BG7YXY"}
+
+	if !client.handleRoomUsers([]byte(`{"type":"room_users_req","room":"default"}`)) {
+		t.Fatal("expected room_users_req to be handled")
+	}
+
+	select {
+	case msg := <-client.send:
+		if msg.messageType != websocket.TextMessage {
+			t.Fatalf("got message type %d, expected text", msg.messageType)
+		}
+		var payload struct {
+			Type       string `json:"type"`
+			Room       string `json:"room"`
+			Revision   int    `json:"revision"`
+			ServerTime string `json:"server_time"`
+			Truncated  bool   `json:"truncated"`
+			Users      []struct {
+				DeviceID  string `json:"device_id"`
+				Callsign  string `json:"callsign"`
+				FWVersion string `json:"fw_version"`
+				Talking   bool   `json:"talking"`
+			} `json:"users"`
+		}
+		if err := json.Unmarshal(msg.data, &payload); err != nil {
+			t.Fatalf("invalid room_users json: %v", err)
+		}
+		if payload.Type != "room_users" || payload.Room != "default" || payload.Revision == 0 || payload.Truncated {
+			t.Fatalf("unexpected room_users metadata: %+v", payload)
+		}
+		if payload.ServerTime == "" {
+			t.Fatal("expected server_time")
+		}
+		if len(payload.Users) != 1 {
+			t.Fatalf("expected 1 user, got %d", len(payload.Users))
+		}
+		user := payload.Users[0]
+		if user.DeviceID != "terminal" || user.Callsign != "BG7YXY" || user.FWVersion != "coffee-v2" || !user.Talking {
+			t.Fatalf("unexpected room user: %+v", user)
+		}
+	default:
+		t.Fatal("got no room_users response")
+	}
+}
+
+func TestIntercomStartStopBroadcastsRoomUsersSnapshots(t *testing.T) {
+	hub := NewHub()
+	speaker := testClient(hub, "speaker", "default")
+	listener := testClient(hub, "listener", "default")
+	speaker.callsign = "BG7YXY"
+	listener.callsign = "BG7ABC"
+	hub.clients[speaker] = struct{}{}
+	hub.clients[listener] = struct{}{}
+
+	hub.handleIntercomStart(intercomStartRequest{client: speaker, room: "default", callsign: "BG7YXY"})
+	assertTextMessageType(t, speaker, "intercom_talk_start_ack", "speaker ack")
+	assertTextMessageType(t, speaker, "intercom_talking", "speaker talking true")
+	assertTextMessageType(t, listener, "intercom_talking", "listener talking true")
+	assertRoomUsersTalking(t, speaker, "speaker users after start", "speaker", true)
+	assertRoomUsersTalking(t, listener, "listener users after start", "speaker", true)
+
+	hub.handleIntercomStop(intercomStopRequest{client: speaker, room: "default", callsign: "BG7YXY"})
+	assertTextMessageTypeSkippingDiag(t, speaker, "intercom_talking", "speaker talking false")
+	assertTextMessageTypeSkippingDiag(t, listener, "intercom_talking", "listener talking false")
+	assertRoomUsersTalking(t, speaker, "speaker users after stop", "speaker", false)
+	assertRoomUsersTalking(t, listener, "listener users after stop", "speaker", false)
+}
+
 func TestHubAudioFrameForwardsOnlySpeakerToSameRoomOthers(t *testing.T) {
 	hub := NewHub()
 	speaker := testClient(hub, "speaker", "default")
@@ -169,6 +293,97 @@ func TestHubAudioFrameForwardsOnlySpeakerToSameRoomOthers(t *testing.T) {
 	assertNoMessage(t, speaker, "speaker")
 	assertBinaryMessage(t, listener, frame, "listener")
 	assertNoMessage(t, otherRoom, "other room")
+}
+
+func assertTextMessageType(t *testing.T, client *Client, expectedType string, label string) map[string]any {
+	t.Helper()
+
+	select {
+	case msg := <-client.send:
+		if msg.messageType != websocket.TextMessage {
+			t.Fatalf("%s got message type %d", label, msg.messageType)
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(msg.data, &payload); err != nil {
+			t.Fatalf("%s got invalid json: %v", label, err)
+		}
+		if payload["type"] != expectedType {
+			t.Fatalf("%s got type %v, expected %s payload=%s", label, payload["type"], expectedType, string(msg.data))
+		}
+		return payload
+	default:
+		t.Fatalf("%s got no message", label)
+	}
+	return nil
+}
+
+func assertTextMessageTypeSkippingDiag(t *testing.T, client *Client, expectedType string, label string) map[string]any {
+	t.Helper()
+
+	for i := 0; i < 4; i++ {
+		payload := assertAnyTextMessage(t, client, label)
+		if payload["type"] == "intercom_audio_diag" {
+			continue
+		}
+		if payload["type"] != expectedType {
+			t.Fatalf("%s got type %v, expected %s payload=%+v", label, payload["type"], expectedType, payload)
+		}
+		return payload
+	}
+	t.Fatalf("%s got only diagnostic messages, expected %s", label, expectedType)
+	return nil
+}
+
+func assertRoomUsersTalking(t *testing.T, client *Client, label string, deviceID string, talking bool) {
+	t.Helper()
+
+	var payload map[string]any
+	for i := 0; i < 4; i++ {
+		payload = assertAnyTextMessage(t, client, label)
+		if payload["type"] == "room_users" {
+			break
+		}
+	}
+	if payload["type"] != "room_users" {
+		t.Fatalf("%s got type %v, expected room_users payload=%+v", label, payload["type"], payload)
+	}
+	users, ok := payload["users"].([]any)
+	if !ok {
+		t.Fatalf("%s users missing or invalid: %+v", label, payload)
+	}
+	for _, rawUser := range users {
+		user, ok := rawUser.(map[string]any)
+		if !ok {
+			continue
+		}
+		if user["device_id"] != deviceID {
+			continue
+		}
+		if user["talking"] != talking {
+			t.Fatalf("%s user talking=%v, expected %t", label, user["talking"], talking)
+		}
+		return
+	}
+	t.Fatalf("%s did not include device_id=%s: %+v", label, deviceID, payload)
+}
+
+func assertAnyTextMessage(t *testing.T, client *Client, label string) map[string]any {
+	t.Helper()
+
+	select {
+	case msg := <-client.send:
+		if msg.messageType != websocket.TextMessage {
+			t.Fatalf("%s got message type %d", label, msg.messageType)
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(msg.data, &payload); err != nil {
+			t.Fatalf("%s got invalid json: %v", label, err)
+		}
+		return payload
+	default:
+		t.Fatalf("%s got no message", label)
+	}
+	return nil
 }
 
 func TestHubAudioFrameDropsNonSpeakerAndStoppedSpeaker(t *testing.T) {

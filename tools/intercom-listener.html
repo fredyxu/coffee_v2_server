@@ -250,8 +250,8 @@
       <div class="title-block">
         <h1>Coffee PTT Test</h1>
         <div class="build-info">
-          <span>Page version <b id="pageVersion">ptt-g711-20260625-113718</b></span>
-          <span>Page modified <b id="pageModifiedAt">2026-06-25 11:37:18 CST</b></span>
+          <span>Page version <b id="pageVersion">__PAGE_VERSION__</b></span>
+          <span>Page modified <b id="pageModifiedAt">__PAGE_MODIFIED_AT__</b></span>
           <span>Server runtime <b id="serverRuntimeVersion">__SERVER_RUNTIME_VERSION__</b></span>
           <span>Runtime modified <b id="serverRuntimeModifiedAt">__SERVER_RUNTIME_MODIFIED_AT__</b></span>
           <span>Audio parser <b id="audioParserVersion">__AUDIO_PARSER_VERSION__</b></span>
@@ -390,8 +390,8 @@
 
   <script>
     const pageBuild = {
-      version: 'ptt-g711-20260625-113718',
-      modifiedAt: '2026-06-25 11:37:18 CST',
+      version: '__PAGE_VERSION__',
+      modifiedAt: '__PAGE_MODIFIED_AT__',
       serverRuntimeVersion: '__SERVER_RUNTIME_VERSION__',
       serverRuntimeModifiedAt: '__SERVER_RUNTIME_MODIFIED_AT__',
       audioParserVersion: '__AUDIO_PARSER_VERSION__'
@@ -530,6 +530,36 @@
       url.searchParams.set('device_id', els.deviceId.value || 'browser-listener');
       url.searchParams.set('fw_version', els.fwVersion.value || 'browser-test');
       return url.toString();
+    }
+
+    function buildStatusUrl() {
+      const url = new URL(els.serverUrl.value || window.location.href);
+      url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:';
+      url.pathname = '/api/status';
+      url.search = '';
+      return url.toString();
+    }
+
+    async function refreshServerStatus() {
+      try {
+        const response = await fetch(buildStatusUrl(), { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const status = await response.json();
+        if (status.runtime_version) {
+          els.serverRuntimeVersion.textContent = status.runtime_version;
+        }
+        if (status.runtime_modified_at) {
+          els.serverRuntimeModifiedAt.textContent = status.runtime_modified_at;
+        }
+        if (status.audio_parser_version) {
+          els.audioParserVersion.textContent = status.audio_parser_version;
+        }
+        log('INFO', 'server status', status);
+      } catch (err) {
+        log('WARN', 'server status fetch failed', err.message);
+      }
     }
 
     function resetCounters() {
@@ -822,9 +852,26 @@
       }
     }
 
-    async function playBinaryFrame(data) {
-      const arrayBuffer = await data.arrayBuffer();
-      const receivedAt = performance.now();
+    function splitAudioBatch(arrayBuffer) {
+      const frames = [];
+      let offset = 0;
+      while (offset < arrayBuffer.byteLength) {
+        if (arrayBuffer.byteLength - offset < 12) {
+          throw new Error(`truncated batch tail: ${arrayBuffer.byteLength - offset} bytes`);
+        }
+        const view = new DataView(arrayBuffer, offset);
+        const header = parseHeader(view);
+        const frameBytes = 12 + payloadBytesForHeader(header);
+        if (offset + frameBytes > arrayBuffer.byteLength) {
+          throw new Error(`truncated batch frame seq=${header.seq} need=${frameBytes} remain=${arrayBuffer.byteLength - offset}`);
+        }
+        frames.push(arrayBuffer.slice(offset, offset + frameBytes));
+        offset += frameBytes;
+      }
+      return frames;
+    }
+
+    async function playBinaryFrame(arrayBuffer, receivedAt) {
       const view = new DataView(arrayBuffer);
       const header = parseHeader(view);
       const payloadBytes = arrayBuffer.byteLength - 12;
@@ -1041,7 +1088,18 @@
         }
 
         try {
-          await playBinaryFrame(event.data);
+          const arrayBuffer = await event.data.arrayBuffer();
+          const receivedAt = performance.now();
+          const frames = splitAudioBatch(arrayBuffer);
+          if (frames.length > 1) {
+            log('AUDIO', 'browser split binary batch', {
+              frames: frames.length,
+              bytes: arrayBuffer.byteLength
+            });
+          }
+          for (const frame of frames) {
+            await playBinaryFrame(frame, receivedAt);
+          }
         } catch (err) {
           state.invalidFrames += 1;
           els.invalidFrames.textContent = state.invalidFrames;
@@ -1091,6 +1149,7 @@
     els.serverRuntimeModifiedAt.textContent = pageBuild.serverRuntimeModifiedAt;
     els.audioParserVersion.textContent = pageBuild.audioParserVersion;
     log('INFO', 'test page build', pageBuild);
+    refreshServerStatus();
     resetCounters();
     startTimer();
   </script>
