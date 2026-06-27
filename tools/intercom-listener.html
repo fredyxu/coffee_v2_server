@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Coffee PTT Test</title>
+  <title>Coffee PTT 测试</title>
   <style>
     :root {
       color-scheme: light;
@@ -110,7 +110,8 @@
       font-size: 13px;
       color: var(--muted);
     }
-    input {
+    input,
+    select {
       height: 36px;
       border: 1px solid #cbd5e1;
       border-radius: 6px;
@@ -248,23 +249,23 @@
   <main>
     <div class="topbar">
       <div class="title-block">
-        <h1>Coffee PTT Test</h1>
+        <h1>Coffee PTT 测试</h1>
         <div class="build-info">
-          <span>Page version <b id="pageVersion">__PAGE_VERSION__</b></span>
-          <span>Page modified <b id="pageModifiedAt">__PAGE_MODIFIED_AT__</b></span>
-          <span>Server runtime <b id="serverRuntimeVersion">__SERVER_RUNTIME_VERSION__</b></span>
-          <span>Runtime modified <b id="serverRuntimeModifiedAt">__SERVER_RUNTIME_MODIFIED_AT__</b></span>
-          <span>Audio parser <b id="audioParserVersion">__AUDIO_PARSER_VERSION__</b></span>
+          <span>页面版本 <b id="pageVersion">__PAGE_VERSION__</b></span>
+          <span>页面修改时间 <b id="pageModifiedAt">__PAGE_MODIFIED_AT__</b></span>
+          <span>服务端版本 <b id="serverRuntimeVersion">__SERVER_RUNTIME_VERSION__</b></span>
+          <span>服务端构建时间 <b id="serverRuntimeModifiedAt">__SERVER_RUNTIME_MODIFIED_AT__</b></span>
+          <span>音频解析器 <b id="audioParserVersion">__AUDIO_PARSER_VERSION__</b></span>
         </div>
       </div>
-      <span id="statusBadge" class="badge">Disconnected</span>
+      <span id="statusBadge" class="badge">未连接</span>
     </div>
 
     <section class="panel">
-      <h2>Connection</h2>
+      <h2>连接</h2>
       <div class="grid">
         <label>
-          Server URL
+          服务端 URL
           <input id="serverUrl" value="wss://coffee.zclub.cool/ws">
         </label>
         <label>
@@ -272,116 +273,170 @@
           <input id="token" value="zclub-coffee-v2">
         </label>
         <label>
-          Room
+          房间
           <input id="room" value="default">
         </label>
         <label>
-          Callsign
+          呼号
           <input id="callsign" value="Browser">
         </label>
         <label>
-          Device ID
+          设备 ID
           <input id="deviceId" value="browser-listener">
         </label>
         <label>
-          FW Version
+          固件版本
           <input id="fwVersion" value="browser-test">
         </label>
       </div>
       <div class="actions">
-        <button id="unlockAudio">Unlock audio</button>
-        <button id="connect" class="primary">Connect</button>
-        <button id="disconnect" disabled>Disconnect</button>
-        <button id="sendPing" disabled>Send ping</button>
-        <span id="audioState" class="muted">Audio locked</span>
+        <button id="unlockAudio">解锁音频</button>
+        <button id="connect" class="primary">连接</button>
+        <button id="disconnect" disabled>断开</button>
+        <button id="sendPing" disabled>发送 ping</button>
+        <span id="audioState" class="muted">音频未解锁</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>ESP32 终端模拟发送</h2>
+      <div class="grid">
+        <label>
+          模拟音源
+          <select id="simSource">
+            <option value="tone">内置测试音</option>
+            <option value="beep">间歇提示音</option>
+          </select>
+        </label>
+        <label>
+          编码
+          <select id="simCodec">
+            <option value="1">G.711 u-law（ESP32 默认）</option>
+            <option value="0">PCM16</option>
+          </select>
+        </label>
+        <label>
+          发送批量
+          <select id="simBatch">
+            <option value="1">每包 1 帧</option>
+            <option value="2">每包 2 帧</option>
+            <option value="5">每包 5 帧</option>
+          </select>
+        </label>
+        <label>
+          测试音频率 Hz
+          <input id="simFrequency" value="880">
+        </label>
+        <label>
+          音量 0-1
+          <input id="simVolume" value="0.35">
+        </label>
+        <label>
+          模拟设备 ID
+          <input id="simDeviceHint" value="browser-esp32-sim">
+        </label>
+      </div>
+      <div class="actions">
+        <button id="applySimIdentity">套用模拟终端身份</button>
+        <button id="simStart" class="primary" disabled>开始模拟发话</button>
+        <button id="simStop" class="danger" disabled>停止模拟发话</button>
+        <span id="simState" class="muted">未启动</span>
+      </div>
+      <div class="stats" style="margin-top: 12px;">
+        <div class="stat"><b>发送帧数</b><span id="simFrames">0</span><small>真实 ESP32 二进制帧</small></div>
+        <div class="stat"><b>发送字节</b><span id="simBytes">0</span><small>头部 + 载荷</small></div>
+        <div class="stat"><b>Seq</b><span id="simSeq">-</span><small>uint16 自增</small></div>
+        <div class="stat"><b>发送速率</b><span id="simRate">0/s</span><small>目标 50 帧/s</small></div>
+        <div class="stat"><b>编码</b><span id="simCodecState">u-law</span><small>8kHz / 160 采样</small></div>
+        <div class="stat"><b>运行时间</b><span id="simDuration">-</span><small>抢麦成功后计时</small></div>
       </div>
     </section>
 
     <section class="two">
       <div class="panel">
-        <h2>Session</h2>
+        <h2>会话</h2>
         <div class="kv">
-          <b>WebSocket</b><span id="wsState">Disconnected</span>
-          <b>Connected at</b><span id="connectedAt">-</span>
-          <b>Duration</b><span id="duration">-</span>
-          <b>Current URL</b><span id="currentUrl">-</span>
-          <b>Last close</b><span id="lastClose">-</span>
-          <b>Last message</b><span id="lastMessage">-</span>
+          <b>WebSocket</b><span id="wsState">未连接</span>
+          <b>连接时间</b><span id="connectedAt">-</span>
+          <b>持续时间</b><span id="duration">-</span>
+          <b>当前 URL</b><span id="currentUrl">-</span>
+          <b>最后断开</b><span id="lastClose">-</span>
+          <b>最后消息</b><span id="lastMessage">-</span>
         </div>
       </div>
 
       <div class="panel">
-        <h2>PTT Signal</h2>
+        <h2>PTT 信令</h2>
         <div class="kv">
-          <b>Room</b><span id="signalRoom">-</span>
-          <b>Speaker</b><span id="speaker">-</span>
-          <b>Talking</b><span id="talking">false</span>
-          <b>Last start ack</b><span id="startAck">-</span>
-          <b>Last pong</b><span id="lastPong">-</span>
-          <b>JSON messages</b><span id="jsonCount">0</span>
+          <b>房间</b><span id="signalRoom">-</span>
+          <b>发话方</b><span id="speaker">-</span>
+          <b>正在发话</b><span id="talking">否</span>
+          <b>抢麦结果</b><span id="startAck">-</span>
+          <b>最后 pong</b><span id="lastPong">-</span>
+          <b>JSON 消息</b><span id="jsonCount">0</span>
         </div>
       </div>
     </section>
 
     <section class="panel">
-      <h2>Server Audio Diagnostics</h2>
+      <h2>服务端音频诊断</h2>
       <div class="stats">
-        <div class="stat"><b>Room</b><span id="serverRoom">-</span><small>reported by server</small></div>
-        <div class="stat"><b>Speaker</b><span id="serverSpeaker">-</span><small id="serverSpeakerDevice">device -</small></div>
-        <div class="stat"><b>Listeners</b><span id="serverListeners">0</span><small>same room excluding speaker</small></div>
-        <div class="stat"><b>Inbound / valid</b><span id="serverInboundValid">0 / 0</span><small>binary parsed on server</small></div>
-        <div class="stat"><b>Forwarded / dropped</b><span id="serverForwardedDropped">0 / 0</span><small>server routing result</small></div>
-        <div class="stat"><b>Receive ratio</b><span id="serverRatio">-</span><small>forwarded / expected</small></div>
-        <div class="stat"><b>First audio</b><span id="serverFirstAudioDelay">-</span><small>server delay after talking=true</small></div>
-        <div class="stat"><b>Last seq</b><span id="serverLastSeq">-</span><small id="serverSeqGaps">seq gaps 0</small></div>
-        <div class="stat"><b>Last drop</b><span id="serverLastDrop">-</span><small>reason from server</small></div>
-        <div class="stat"><b>Segment</b><span id="serverSegment">-</span><small id="serverDuration">duration -</small></div>
+        <div class="stat"><b>房间</b><span id="serverRoom">-</span><small>服务端上报</small></div>
+        <div class="stat"><b>发话方</b><span id="serverSpeaker">-</span><small id="serverSpeakerDevice">设备 -</small></div>
+        <div class="stat"><b>监听者</b><span id="serverListeners">0</span><small>同房间排除发话方</small></div>
+        <div class="stat"><b>入站 / 有效</b><span id="serverInboundValid">0 / 0</span><small>服务端解析二进制</small></div>
+        <div class="stat"><b>转发 / 丢弃</b><span id="serverForwardedDropped">0 / 0</span><small>服务端路由结果</small></div>
+        <div class="stat"><b>接收比例</b><span id="serverRatio">-</span><small>转发 / 预期</small></div>
+        <div class="stat"><b>首帧延迟</b><span id="serverFirstAudioDelay">-</span><small>发话开始后</small></div>
+        <div class="stat"><b>最后 seq</b><span id="serverLastSeq">-</span><small id="serverSeqGaps">seq 缺口 0</small></div>
+        <div class="stat"><b>最后丢弃</b><span id="serverLastDrop">-</span><small>服务端原因</small></div>
+        <div class="stat"><b>片段</b><span id="serverSegment">-</span><small id="serverDuration">时长 -</small></div>
       </div>
     </section>
 
     <section class="panel">
-      <h2>Browser Audio Frames</h2>
+      <h2>浏览器实际接收音频</h2>
       <div class="stats">
-        <div class="stat"><b>Frames</b><span id="frames">0</span><small>valid binary</small></div>
-        <div class="stat"><b>Bytes</b><span id="bytesTotal">0</span><small>audio payload + header</small></div>
-        <div class="stat"><b>Invalid frames</b><span id="invalidFrames">0</span><small>header or PCM error</small></div>
-        <div class="stat"><b>Seq gaps</b><span id="seqGaps">0</span><small>missing or out of order</small></div>
-        <div class="stat"><b>First audio</b><span id="firstAudioDelay">-</span><small>after talking=true</small></div>
-        <div class="stat"><b>Receive ratio</b><span id="segmentRatio">-</span><small>actual / expected</small></div>
-        <div class="stat"><b>Seq</b><span id="seq">-</span><small id="seqState">waiting</small></div>
-        <div class="stat"><b>Samples</b><span id="samples">-</span><small>expected 160-320</small></div>
-        <div class="stat"><b>Sample rate</b><span id="sampleRate">-</span><small>expected 8000</small></div>
-        <div class="stat"><b>Payload</b><span id="payloadBytes">-</span><small>expected by codec</small></div>
-        <div class="stat"><b>Rate</b><span id="frameRate">0/s</span><small id="audioGap">no audio</small></div>
+        <div class="stat"><b>帧数</b><span id="frames">0</span><small>有效二进制</small></div>
+        <div class="stat"><b>字节</b><span id="bytesTotal">0</span><small>头部 + 载荷</small></div>
+        <div class="stat"><b>无效帧</b><span id="invalidFrames">0</span><small>头部或音频错误</small></div>
+        <div class="stat"><b>Seq 缺口</b><span id="seqGaps">0</span><small>丢失或乱序</small></div>
+        <div class="stat"><b>首帧延迟</b><span id="firstAudioDelay">-</span><small>发话开始后</small></div>
+        <div class="stat"><b>接收比例</b><span id="segmentRatio">-</span><small>实际 / 预期</small></div>
+        <div class="stat"><b>Seq</b><span id="seq">-</span><small id="seqState">等待</small></div>
+        <div class="stat"><b>采样数</b><span id="samples">-</span><small>预期 160-320</small></div>
+        <div class="stat"><b>采样率</b><span id="sampleRate">-</span><small>预期 8000</small></div>
+        <div class="stat"><b>载荷</b><span id="payloadBytes">-</span><small>按编码判断</small></div>
+        <div class="stat"><b>速率</b><span id="frameRate">0/s</span><small id="audioGap">无音频</small></div>
       </div>
     </section>
 
     <section class="panel">
-      <h2>Talk Segment</h2>
+      <h2>通话片段</h2>
       <div class="stats">
-        <div class="stat"><b>Segment</b><span id="segmentId">0</span><small>increments on talking=true</small></div>
-        <div class="stat"><b>Segment frames</b><span id="segmentFrames">0</span><small id="segmentExpected">expected while talking</small></div>
-        <div class="stat"><b>Segment duration</b><span id="segmentDuration">-</span><small>talking true to false</small></div>
-        <div class="stat"><b>Stop summary</b><span id="segmentSummary">-</span><small>last completed segment</small></div>
+        <div class="stat"><b>片段</b><span id="segmentId">0</span><small>发话开始时递增</small></div>
+        <div class="stat"><b>片段帧数</b><span id="segmentFrames">0</span><small id="segmentExpected">发话期间预期值</small></div>
+        <div class="stat"><b>片段时长</b><span id="segmentDuration">-</span><small>从开始发话到停止</small></div>
+        <div class="stat"><b>停止摘要</b><span id="segmentSummary">-</span><small>上一个完成片段</small></div>
       </div>
     </section>
 
     <section class="panel">
-      <h2>Diagnostics</h2>
+      <h2>诊断结论</h2>
       <div class="stats">
-        <div class="stat"><b>Conclusion</b><span id="diagnosis">Waiting</span><small>server vs browser path</small></div>
-        <div class="stat"><b>Last gap</b><span id="lastFrameGap">-</span><small>between audio frames</small></div>
-        <div class="stat"><b>Audio clock</b><span id="audioClock">-</span><small>browser context</small></div>
-        <div class="stat"><b>Queue</b><span id="queueDelay">-</span><small>scheduled playback</small></div>
+        <div class="stat"><b>结论</b><span id="diagnosis">等待中</span><small>服务端与浏览器链路</small></div>
+        <div class="stat"><b>最后间隔</b><span id="lastFrameGap">-</span><small>音频帧之间</small></div>
+        <div class="stat"><b>音频时钟</b><span id="audioClock">-</span><small>浏览器上下文</small></div>
+        <div class="stat"><b>播放队列</b><span id="queueDelay">-</span><small>已排队播放</small></div>
       </div>
     </section>
 
     <section class="panel">
       <div class="log-actions">
-        <h2>Log</h2>
+        <h2>日志</h2>
         <div class="actions" style="margin-top: 0;">
-          <button id="clearLog">Clear log</button>
-          <button id="copyLog">Copy log</button>
+          <button id="clearLog">清空日志</button>
+          <button id="copyLog">复制日志</button>
         </div>
       </div>
       <pre id="log"></pre>
@@ -408,6 +463,22 @@
       connect: document.getElementById('connect'),
       disconnect: document.getElementById('disconnect'),
       sendPing: document.getElementById('sendPing'),
+      simSource: document.getElementById('simSource'),
+      simCodec: document.getElementById('simCodec'),
+      simBatch: document.getElementById('simBatch'),
+      simFrequency: document.getElementById('simFrequency'),
+      simVolume: document.getElementById('simVolume'),
+      simDeviceHint: document.getElementById('simDeviceHint'),
+      applySimIdentity: document.getElementById('applySimIdentity'),
+      simStart: document.getElementById('simStart'),
+      simStop: document.getElementById('simStop'),
+      simState: document.getElementById('simState'),
+      simFrames: document.getElementById('simFrames'),
+      simBytes: document.getElementById('simBytes'),
+      simSeq: document.getElementById('simSeq'),
+      simRate: document.getElementById('simRate'),
+      simCodecState: document.getElementById('simCodecState'),
+      simDuration: document.getElementById('simDuration'),
       clearLog: document.getElementById('clearLog'),
       copyLog: document.getElementById('copyLog'),
       statusBadge: document.getElementById('statusBadge'),
@@ -495,6 +566,17 @@
       segmentRoom: '',
       serverDiag: null,
       lastServerDropLog: '',
+      sim: {
+        pendingStart: false,
+        active: false,
+        timer: null,
+        seq: 0,
+        frames: 0,
+        bytes: 0,
+        startedAt: 0,
+        frameWindow: [],
+        phase: 0
+      },
       timer: null
     };
 
@@ -532,6 +614,10 @@
       return url.toString();
     }
 
+    function wsOpen() {
+      return state.ws && state.ws.readyState === WebSocket.OPEN;
+    }
+
     function buildStatusUrl() {
       const url = new URL(els.serverUrl.value || window.location.href);
       url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:';
@@ -556,9 +642,9 @@
         if (status.audio_parser_version) {
           els.audioParserVersion.textContent = status.audio_parser_version;
         }
-        log('INFO', 'server status', status);
+        log('INFO', '服务端状态', status);
       } catch (err) {
-        log('WARN', 'server status fetch failed', err.message);
+        log('WARN', '获取服务端状态失败', err.message);
       }
     }
 
@@ -581,9 +667,10 @@
       state.segmentRoom = '';
       state.serverDiag = null;
       state.lastServerDropLog = '';
+      resetSimulatorCounters();
       els.serverRoom.textContent = '-';
       els.serverSpeaker.textContent = '-';
-      els.serverSpeakerDevice.textContent = 'device -';
+      els.serverSpeakerDevice.textContent = '设备 -';
       els.serverListeners.textContent = '0';
       els.serverInboundValid.textContent = '0 / 0';
       els.serverForwardedDropped.textContent = '0 / 0';
@@ -592,29 +679,29 @@
       els.serverFirstAudioDelay.textContent = '-';
       els.serverFirstAudioDelay.className = '';
       els.serverLastSeq.textContent = '-';
-      els.serverSeqGaps.textContent = 'seq gaps 0';
+      els.serverSeqGaps.textContent = 'seq 缺口 0';
       els.serverLastDrop.textContent = '-';
       els.serverLastDrop.className = '';
       els.serverSegment.textContent = '-';
-      els.serverDuration.textContent = 'duration -';
-      els.diagnosis.textContent = 'Waiting';
+      els.serverDuration.textContent = '时长 -';
+      els.diagnosis.textContent = '等待中';
       els.diagnosis.className = '';
       els.frames.textContent = '0';
       els.segmentId.textContent = '0';
       els.segmentFrames.textContent = '0';
-      els.segmentExpected.textContent = 'expected while talking';
+      els.segmentExpected.textContent = '发话期间预期值';
       els.segmentRatio.textContent = '-';
       els.firstAudioDelay.textContent = '-';
       els.segmentDuration.textContent = '-';
       els.segmentSummary.textContent = '-';
       els.seq.textContent = '-';
-      els.seqState.textContent = 'waiting';
+      els.seqState.textContent = '等待';
       els.seqState.className = '';
       els.samples.textContent = '-';
       els.sampleRate.textContent = '-';
       els.payloadBytes.textContent = '-';
       els.frameRate.textContent = '0/s';
-      els.audioGap.textContent = 'no audio';
+      els.audioGap.textContent = '无音频';
       els.bytesTotal.textContent = '0';
       els.invalidFrames.textContent = '0';
       els.seqGaps.textContent = '0';
@@ -624,9 +711,218 @@
       els.lastMessage.textContent = '-';
       els.signalRoom.textContent = els.room.value || 'default';
       els.speaker.textContent = '-';
-      els.talking.textContent = 'false';
+      els.talking.textContent = '否';
       els.startAck.textContent = '-';
       els.lastPong.textContent = '-';
+    }
+
+    function resetSimulatorCounters() {
+      stopSimulatorTimerOnly();
+      state.sim.pendingStart = false;
+      state.sim.active = false;
+      state.sim.seq = 0;
+      state.sim.frames = 0;
+      state.sim.bytes = 0;
+      state.sim.startedAt = 0;
+      state.sim.frameWindow = [];
+      state.sim.phase = 0;
+      els.simFrames.textContent = '0';
+      els.simBytes.textContent = '0';
+      els.simSeq.textContent = '-';
+      els.simRate.textContent = '0/s';
+      els.simDuration.textContent = '-';
+      els.simState.textContent = '未启动';
+      els.simState.className = 'muted';
+      updateSimulatorButtons();
+    }
+
+    function updateSimulatorButtons() {
+      const connected = wsOpen();
+      els.simStart.disabled = !connected || state.sim.active || state.sim.pendingStart;
+      els.simStop.disabled = !connected || (!state.sim.active && !state.sim.pendingStart);
+    }
+
+    function clampNumber(value, min, max, fallback) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) {
+        return fallback;
+      }
+      return Math.min(max, Math.max(min, n));
+    }
+
+    function pcm16ToUlaw(sample) {
+      const bias = 0x84;
+      const clip = 32635;
+      let pcm = Math.max(-clip, Math.min(clip, sample | 0));
+      let sign = 0;
+      if (pcm < 0) {
+        sign = 0x80;
+        pcm = -pcm;
+      }
+      pcm += bias;
+      let exponent = 7;
+      for (let mask = 0x4000; (pcm & mask) === 0 && exponent > 0; mask >>= 1) {
+        exponent -= 1;
+      }
+      const mantissa = (pcm >> (exponent + 3)) & 0x0f;
+      return (~(sign | (exponent << 4) | mantissa)) & 0xff;
+    }
+
+    function simulatorSample(sampleIndex, frequency, volume, source) {
+      const t = (state.sim.phase + sampleIndex) / expected.sampleRate;
+      let envelope = 1;
+      if (source === 'beep') {
+        const cycle = t % 1.2;
+        envelope = cycle < 0.45 ? 1 : 0;
+      }
+      const voiceLike = Math.sin(2 * Math.PI * frequency * t) * 0.75 +
+        Math.sin(2 * Math.PI * frequency * 1.5 * t) * 0.18 +
+        Math.sin(2 * Math.PI * 120 * t) * 0.07;
+      return Math.round(voiceLike * envelope * volume * 32767);
+    }
+
+    function buildSimulatorFrame() {
+      const codec = Number(els.simCodec.value);
+      const samples = 160;
+      const payloadBytes = codec === 1 ? samples : samples * 2;
+      const frame = new ArrayBuffer(12 + payloadBytes);
+      const view = new DataView(frame);
+      const frequency = clampNumber(els.simFrequency.value, 100, 3000, 880);
+      const volume = clampNumber(els.simVolume.value, 0, 1, 0.35);
+      const source = els.simSource.value;
+
+      view.setUint8(0, 0x43);
+      view.setUint8(1, 0x41);
+      view.setUint8(2, 1);
+      view.setUint8(3, codec);
+      view.setUint16(4, state.sim.seq & 0xffff, true);
+      view.setUint16(6, samples, true);
+      view.setUint32(8, expected.sampleRate, true);
+
+      for (let i = 0; i < samples; i++) {
+        const pcm = simulatorSample(i, frequency, volume, source);
+        if (codec === 1) {
+          view.setUint8(12 + i, pcm16ToUlaw(pcm));
+        } else {
+          view.setInt16(12 + i * 2, pcm, true);
+        }
+      }
+      state.sim.phase += samples;
+      state.sim.seq = (state.sim.seq + 1) & 0xffff;
+      return frame;
+    }
+
+    function buildSimulatorBatch() {
+      const batchCount = clampNumber(els.simBatch.value, 1, 10, 1);
+      const frames = [];
+      let totalBytes = 0;
+      for (let i = 0; i < batchCount; i++) {
+        const frame = buildSimulatorFrame();
+        frames.push(new Uint8Array(frame));
+        totalBytes += frame.byteLength;
+      }
+      const batch = new Uint8Array(totalBytes);
+      let offset = 0;
+      for (const frame of frames) {
+        batch.set(frame, offset);
+        offset += frame.byteLength;
+      }
+      return { data: batch.buffer, frames: frames.length };
+    }
+
+    function simulatorIntervalMs() {
+      return clampNumber(els.simBatch.value, 1, 10, 1) * 20;
+    }
+
+    function sendSimulatorAudioTick() {
+      if (!state.sim.active || !wsOpen()) {
+        stopSimulator(false);
+        return;
+      }
+      const sentAt = performance.now();
+      const batch = buildSimulatorBatch();
+      state.ws.send(batch.data);
+      state.sim.frames += batch.frames;
+      state.sim.bytes += batch.data.byteLength;
+      state.sim.frameWindow.push(sentAt);
+      state.sim.frameWindow = state.sim.frameWindow.filter(t => sentAt - t < 1000);
+      els.simFrames.textContent = state.sim.frames;
+      els.simBytes.textContent = state.sim.bytes;
+      els.simSeq.textContent = (state.sim.seq - 1) & 0xffff;
+      els.simRate.textContent = `${state.sim.frameWindow.length}/s`;
+      els.simCodecState.textContent = Number(els.simCodec.value) === 1 ? 'u-law' : 'PCM16';
+      els.simDuration.textContent = `${Math.round(sentAt - state.sim.startedAt)}ms`;
+    }
+
+    function startSimulatorAfterAck() {
+      if (state.sim.active || !state.sim.pendingStart || !wsOpen()) {
+        return;
+      }
+      state.sim.pendingStart = false;
+      state.sim.active = true;
+      state.sim.startedAt = performance.now();
+      state.sim.frameWindow = [];
+      state.sim.timer = setInterval(sendSimulatorAudioTick, simulatorIntervalMs());
+      sendSimulatorAudioTick();
+      els.simState.textContent = '正在模拟 ESP32 发话';
+      els.simState.className = 'ok-text';
+      updateSimulatorButtons();
+      log('ESP32_SIM', '模拟终端开始发送音频', {
+        codec: Number(els.simCodec.value) === 1 ? 'g711_ulaw' : 'pcm16',
+        sample_rate: expected.sampleRate,
+        samples: 160,
+        batch_frames: Number(els.simBatch.value)
+      });
+    }
+
+    function requestSimulatorStart() {
+      if (!wsOpen() || state.sim.active || state.sim.pendingStart) {
+        return;
+      }
+      state.sim.pendingStart = true;
+      state.sim.seq = 0;
+      state.sim.frames = 0;
+      state.sim.bytes = 0;
+      state.sim.phase = 0;
+      els.simState.textContent = '正在抢麦';
+      els.simState.className = 'warn-text';
+      updateSimulatorButtons();
+      state.ws.send(JSON.stringify({
+        type: 'intercom_talk_start',
+        room: els.room.value || 'default',
+        callsign: els.callsign.value || 'BrowserESP32'
+      }));
+      log('ESP32_SIM', '模拟终端发送抢麦请求');
+    }
+
+    function stopSimulatorTimerOnly() {
+      if (state.sim.timer) {
+        clearInterval(state.sim.timer);
+        state.sim.timer = null;
+      }
+    }
+
+    function stopSimulator(sendStop) {
+      const wasActive = state.sim.active || state.sim.pendingStart;
+      stopSimulatorTimerOnly();
+      state.sim.pendingStart = false;
+      state.sim.active = false;
+      if (sendStop && wsOpen() && wasActive) {
+        state.ws.send(JSON.stringify({
+          type: 'intercom_talk_stop',
+          room: els.room.value || 'default',
+          callsign: els.callsign.value || 'BrowserESP32'
+        }));
+      }
+      els.simState.textContent = wasActive ? '已停止' : '未启动';
+      els.simState.className = wasActive ? 'warn-text' : 'muted';
+      updateSimulatorButtons();
+      if (wasActive) {
+        log('ESP32_SIM', '模拟终端停止发送音频', {
+          frames: state.sim.frames,
+          bytes: state.sim.bytes
+        });
+      }
     }
 
     function expectedFramesForElapsed(elapsedMs) {
@@ -643,7 +939,7 @@
     function updateDiagnosis() {
       const server = state.serverDiag;
       if (!server) {
-        els.diagnosis.textContent = 'Waiting';
+        els.diagnosis.textContent = '等待中';
         els.diagnosis.className = '';
         return;
       }
@@ -652,16 +948,16 @@
       const forwarded = Number(server.forwarded_frames || 0);
       const browserFrames = state.segmentFrames;
       if (inbound === 0) {
-        els.diagnosis.textContent = 'ESP32 not reaching server';
+        els.diagnosis.textContent = 'ESP32 未到达服务端';
         els.diagnosis.className = 'err-text';
       } else if (forwarded === 0) {
-        els.diagnosis.textContent = 'Server received but did not forward';
+        els.diagnosis.textContent = '服务端收到但未转发';
         els.diagnosis.className = 'err-text';
       } else if (browserFrames === 0) {
-        els.diagnosis.textContent = 'Server-to-browser or browser receive issue';
+        els.diagnosis.textContent = '服务端到浏览器或浏览器接收异常';
         els.diagnosis.className = 'warn-text';
       } else {
-        els.diagnosis.textContent = 'Audio path OK; check PCM playback or volume';
+        els.diagnosis.textContent = '音频链路正常；如无声请查播放或音量';
         els.diagnosis.className = 'ok-text';
       }
     }
@@ -673,7 +969,7 @@
       const ratio = expectedFrames > 0 ? forwarded / expectedFrames : 0;
       els.serverRoom.textContent = msg.room || '-';
       els.serverSpeaker.textContent = msg.speaker_callsign || '-';
-      els.serverSpeakerDevice.textContent = `device ${msg.speaker_device_id || '-'}`;
+      els.serverSpeakerDevice.textContent = `设备 ${msg.speaker_device_id || '-'}`;
       els.serverListeners.textContent = msg.listener_count ?? 0;
       els.serverInboundValid.textContent = `${msg.inbound_binary_frames || 0} / ${msg.valid_audio_frames || 0}`;
       els.serverForwardedDropped.textContent = `${msg.forwarded_frames || 0} / ${msg.dropped_frames || 0}`;
@@ -682,31 +978,31 @@
       els.serverFirstAudioDelay.textContent = msg.first_audio_delay_ms === null || msg.first_audio_delay_ms === undefined ? '-' : `${msg.first_audio_delay_ms}ms`;
       els.serverFirstAudioDelay.className = msg.first_audio_delay_ms !== null && msg.first_audio_delay_ms !== undefined && msg.first_audio_delay_ms <= 200 ? 'ok-text' : 'warn-text';
       els.serverLastSeq.textContent = msg.last_seq ?? '-';
-      els.serverSeqGaps.textContent = `seq gaps ${msg.seq_gaps || 0}`;
+      els.serverSeqGaps.textContent = `seq 缺口 ${msg.seq_gaps || 0}`;
       els.serverLastDrop.textContent = msg.last_drop_reason || '-';
       els.serverLastDrop.className = msg.dropped_frames > 0 ? 'warn-text' : '';
       els.serverSegment.textContent = msg.segment_id || '-';
-      els.serverDuration.textContent = `duration ${msg.duration_ms || 0}ms`;
+      els.serverDuration.textContent = `时长 ${msg.duration_ms || 0}ms`;
       updateDiagnosis();
 
       if (msg.event === 'segment_start') {
-        log('SERVER_SEGMENT_START', 'server segment started', msg);
+        log('SERVER_SEGMENT_START', '服务端通话片段开始', msg);
       } else if (msg.event === 'summary') {
-        log('SERVER_AUDIO_SUMMARY', 'server segment summary', msg);
+        log('SERVER_AUDIO_SUMMARY', '服务端音频片段摘要', msg);
         if (msg.last_drop_reason && msg.last_drop_reason !== 'none' && state.lastServerDropLog !== msg.last_drop_reason) {
           state.lastServerDropLog = msg.last_drop_reason;
-          log('SERVER_AUDIO_DROP', 'server drop reason at segment end', msg);
+          log('SERVER_AUDIO_DROP', '服务端片段结束时的丢弃原因', msg);
         }
       } else if (msg.event === 'audio_drop' && state.lastServerDropLog !== msg.last_drop_reason) {
         state.lastServerDropLog = msg.last_drop_reason || '';
-        log('SERVER_AUDIO_DROP', 'server audio drop', msg);
+        log('SERVER_AUDIO_DROP', '服务端丢弃音频', msg);
       }
     }
 
     function resetSeqForSegment() {
       state.lastSeq = null;
       els.seq.textContent = '-';
-      els.seqState.textContent = 'waiting for first segment frame';
+      els.seqState.textContent = '等待片段首帧';
       els.seqState.className = '';
     }
 
@@ -723,26 +1019,26 @@
       resetSeqForSegment();
       els.segmentId.textContent = state.segmentId;
       els.segmentFrames.textContent = '0';
-      els.segmentExpected.textContent = 'expected 0';
+      els.segmentExpected.textContent = '预期 0';
       els.segmentRatio.textContent = '-';
-      els.firstAudioDelay.textContent = 'waiting';
+      els.firstAudioDelay.textContent = '等待';
       els.firstAudioDelay.className = 'warn-text';
-      els.segmentDuration.textContent = 'running';
+      els.segmentDuration.textContent = '运行中';
       els.segmentSummary.textContent = '-';
-      els.audioGap.textContent = 'waiting audio';
+      els.audioGap.textContent = '等待音频';
       els.audioGap.className = 'warn-text';
-      log('SEGMENT', 'talk started, seq checker reset', {
+      log('SEGMENT', '通话开始，seq 检查已重置', {
         segment: state.segmentId,
         room: state.segmentRoom,
         speaker: state.segmentSpeaker,
-        expected_rate: '50 frames/s',
-        expected_frame: '20-40ms, 12-byte header + PCM16/u-law payload'
+        expected_rate: '50 帧/秒',
+        expected_frame: '20-40ms，12 字节头部 + PCM16/u-law 载荷'
       });
     }
 
     function finishTalkSegment(msg) {
       if (!state.segmentActive) {
-        log('SIGNAL', 'talk stop received without active segment', msg);
+        log('SIGNAL', '收到停止发话，但当前没有活动片段', msg);
         return;
       }
       const elapsedMs = performance.now() - state.segmentStartedAt;
@@ -760,11 +1056,11 @@
       };
       state.segmentActive = false;
       els.segmentDuration.textContent = `${Math.round(elapsedMs)}ms`;
-      els.segmentExpected.textContent = `expected ${expectedFrames}`;
+      els.segmentExpected.textContent = `预期 ${expectedFrames}`;
       els.segmentRatio.textContent = expectedFrames > 0 ? `${Math.round(ratio * 100)}%` : '-';
       els.segmentRatio.className = ratio >= 0.8 ? 'ok-text' : 'warn-text';
       els.segmentSummary.textContent = `${state.segmentFrames}/${expectedFrames}`;
-      log('BROWSER_SUMMARY', 'browser segment summary', summary);
+      log('BROWSER_SUMMARY', '浏览器接收片段摘要', summary);
       updateDiagnosis();
     }
 
@@ -776,13 +1072,13 @@
         await state.audioContext.resume();
       }
       state.nextPlayTime = Math.max(state.nextPlayTime, state.audioContext.currentTime);
-      els.audioState.textContent = `Audio ${state.audioContext.state}, ${state.audioContext.sampleRate}Hz`;
+      els.audioState.textContent = `音频 ${state.audioContext.state}, ${state.audioContext.sampleRate}Hz`;
       return state.audioContext;
     }
 
     function parseHeader(view) {
       if (view.byteLength < 12) {
-        throw new Error(`binary frame shorter than 12-byte header: ${view.byteLength}`);
+        throw new Error(`二进制帧短于 12 字节头部：${view.byteLength}`);
       }
       const magic = String.fromCharCode(view.getUint8(0)) + String.fromCharCode(view.getUint8(1));
       const version = view.getUint8(2);
@@ -818,7 +1114,7 @@
 
     function updateSeq(header) {
       if (state.lastSeq === null) {
-        els.seqState.textContent = 'first frame';
+        els.seqState.textContent = '首帧';
         state.lastSeq = header.seq;
         return;
       }
@@ -826,11 +1122,11 @@
       if (header.seq !== expectedSeq) {
         state.seqGaps += 1;
         els.seqGaps.textContent = state.seqGaps;
-        els.seqState.textContent = `expected ${expectedSeq}`;
+        els.seqState.textContent = `预期 ${expectedSeq}`;
         els.seqState.className = 'warn-text';
-        log('WARN', 'audio seq gap', { expected: expectedSeq, actual: header.seq });
+        log('WARN', '音频 seq 缺口', { expected: expectedSeq, actual: header.seq });
       } else {
-        els.seqState.textContent = 'continuous';
+        els.seqState.textContent = '连续';
         els.seqState.className = 'ok-text';
       }
       state.lastSeq = header.seq;
@@ -848,7 +1144,7 @@
         warnings.push(`payload=${payloadBytes}`);
       }
       if (warnings.length > 0) {
-        log('WARN', 'audio frame shape differs from expected', warnings.join(', '));
+        log('WARN', '音频帧形状与预期不同', warnings.join(', '));
       }
     }
 
@@ -857,13 +1153,13 @@
       let offset = 0;
       while (offset < arrayBuffer.byteLength) {
         if (arrayBuffer.byteLength - offset < 12) {
-          throw new Error(`truncated batch tail: ${arrayBuffer.byteLength - offset} bytes`);
+          throw new Error(`批量帧尾部不完整：${arrayBuffer.byteLength - offset} 字节`);
         }
         const view = new DataView(arrayBuffer, offset);
         const header = parseHeader(view);
         const frameBytes = 12 + payloadBytesForHeader(header);
         if (offset + frameBytes > arrayBuffer.byteLength) {
-          throw new Error(`truncated batch frame seq=${header.seq} need=${frameBytes} remain=${arrayBuffer.byteLength - offset}`);
+          throw new Error(`批量帧不完整 seq=${header.seq} 需要=${frameBytes} 剩余=${arrayBuffer.byteLength - offset}`);
         }
         frames.push(arrayBuffer.slice(offset, offset + frameBytes));
         offset += frameBytes;
@@ -879,7 +1175,7 @@
       const sampleCount = Math.min(header.samples, availableSamples);
 
       if (sampleCount <= 0) {
-        throw new Error(`empty PCM payload: ${payloadBytes} bytes`);
+        throw new Error(`PCM 载荷为空：${payloadBytes} 字节`);
       }
 
       validateAudioShape(header, payloadBytes);
@@ -921,7 +1217,7 @@
         const delayMs = Math.round(state.segmentFirstAudioAt - state.segmentStartedAt);
         els.firstAudioDelay.textContent = `${delayMs}ms`;
         els.firstAudioDelay.className = delayMs <= 200 ? 'ok-text' : 'warn-text';
-        log('BROWSER_AUDIO', 'first audio frame after talk start', {
+        log('BROWSER_AUDIO', '浏览器收到通话首帧', {
           segment: state.segmentId,
           delay_ms: delayMs,
           seq: header.seq
@@ -937,14 +1233,14 @@
       els.segmentFrames.textContent = state.segmentFrames;
       els.bytesTotal.textContent = state.bytesTotal;
       els.frameRate.textContent = `${state.frameWindow.length}/s`;
-      els.audioGap.textContent = 'receiving';
+      els.audioGap.textContent = '接收中';
       els.audioGap.className = 'ok-text';
       els.queueDelay.textContent = `${Math.max(0, Math.round((state.nextPlayTime - ctx.currentTime) * 1000))}ms`;
-      els.lastMessage.textContent = `binary seq=${header.seq} bytes=${arrayBuffer.byteLength}`;
+      els.lastMessage.textContent = `二进制 seq=${header.seq} 字节=${arrayBuffer.byteLength}`;
       updateDiagnosis();
 
       if (state.frameCount === 1 || state.frameCount % 50 === 0) {
-        log('AUDIO', 'browser frame received', {
+        log('AUDIO', '浏览器收到音频帧', {
           segment: state.segmentId,
           seq: header.seq,
           samples: header.samples,
@@ -971,31 +1267,41 @@
       if (msg.type === 'intercom_talking') {
         els.signalRoom.textContent = msg.room || '-';
         els.speaker.textContent = msg.callsign || '-';
-        els.talking.textContent = String(Boolean(msg.talking));
+        els.talking.textContent = msg.talking ? '是' : '否';
         els.talking.className = msg.talking ? 'ok-text' : '';
         if (msg.talking) {
           beginTalkSegment(msg);
         } else {
           finishTalkSegment(msg);
         }
-        log('SIGNAL', 'intercom_talking', msg);
+        log('SIGNAL', '发话状态广播', msg);
         return;
       }
 
       if (msg.type === 'intercom_talk_start_ack') {
-        els.startAck.textContent = msg.ok ? 'ok=true' : `ok=false ${msg.reason || ''}`.trim();
+        els.startAck.textContent = msg.ok ? '成功' : `失败 ${msg.reason || ''}`.trim();
         els.startAck.className = msg.ok ? 'ok-text' : 'warn-text';
-        log(msg.ok ? 'SIGNAL' : 'WARN', 'intercom_talk_start_ack', msg);
+        if (state.sim.pendingStart) {
+          if (msg.ok) {
+            startSimulatorAfterAck();
+          } else {
+            stopSimulator(false);
+            els.simState.textContent = `抢麦失败：${msg.reason || 'unknown'}`;
+            els.simState.className = 'err-text';
+            updateSimulatorButtons();
+          }
+        }
+        log(msg.ok ? 'SIGNAL' : 'WARN', '抢麦应答', msg);
         return;
       }
 
       if (msg.type === 'pong' || msg.type === 'heartbeat_ack') {
         els.lastPong.textContent = msg.server_time_utc || nowTime();
-        log('KEEPALIVE', msg.type, msg);
+        log('KEEPALIVE', `${msg.type} 应答`, msg);
         return;
       }
 
-      log('JSON', msg.type || 'message', msg);
+      log('JSON', msg.type || '消息', msg);
     }
 
     function startTimer() {
@@ -1010,10 +1316,13 @@
         if (state.audioContext) {
           els.audioClock.textContent = `${state.audioContext.state} ${state.audioContext.currentTime.toFixed(2)}s`;
         }
+        if (state.sim.active) {
+          els.simDuration.textContent = `${Math.round(performance.now() - state.sim.startedAt)}ms`;
+        }
         if (state.lastFrameAt > 0) {
           const silentFor = performance.now() - state.lastFrameAt;
           if (silentFor > 1200) {
-            els.audioGap.textContent = `silent ${Math.round(silentFor)}ms`;
+            els.audioGap.textContent = `静默 ${Math.round(silentFor)}ms`;
             els.audioGap.className = 'warn-text';
           }
         }
@@ -1022,12 +1331,12 @@
           const expectedFrames = expectedFramesForElapsed(elapsedMs);
           const ratio = expectedFrames > 0 ? state.segmentFrames / expectedFrames : 0;
           els.segmentDuration.textContent = `${Math.round(elapsedMs)}ms`;
-          els.segmentExpected.textContent = `expected ${expectedFrames}`;
+          els.segmentExpected.textContent = `预期 ${expectedFrames}`;
           els.segmentRatio.textContent = expectedFrames > 0 ? `${Math.round(ratio * 100)}%` : '-';
           els.segmentRatio.className = ratio >= 0.8 ? 'ok-text' : 'warn-text';
 
           if (elapsedMs > 700 && state.segmentFrames === 0) {
-            els.audioGap.textContent = 'talking but no audio';
+            els.audioGap.textContent = '正在发话但无音频';
             els.audioGap.className = 'err-text';
           }
         }
@@ -1043,37 +1352,41 @@
       const url = buildUrl();
       state.ws = new WebSocket(url);
       state.ws.binaryType = 'blob';
-      setStatus('Connecting', 'warn');
+      setStatus('连接中', 'warn');
       els.connect.disabled = true;
       els.disconnect.disabled = false;
       els.sendPing.disabled = true;
       els.currentUrl.textContent = sanitizeUrlForLog(url);
-      log('INFO', 'connecting', sanitizeUrlForLog(url));
+      updateSimulatorButtons();
+      log('INFO', '正在连接', sanitizeUrlForLog(url));
 
       state.ws.onopen = () => {
         state.connectedAt = Date.now();
         els.connectedAt.textContent = new Date(state.connectedAt).toLocaleString();
         els.lastClose.textContent = '-';
         els.sendPing.disabled = false;
-        setStatus('Connected', 'ok');
+        setStatus('已连接', 'ok');
         startTimer();
-        log('INFO', 'websocket connected');
+        updateSimulatorButtons();
+        log('INFO', 'WebSocket 已连接');
       };
 
       state.ws.onclose = event => {
-        setStatus(`Disconnected (${event.code})`, event.code === 1000 ? '' : 'err');
+        stopSimulator(false);
+        setStatus(`已断开 (${event.code})`, event.code === 1000 ? '' : 'err');
         els.connect.disabled = false;
         els.disconnect.disabled = true;
         els.sendPing.disabled = true;
         els.lastClose.textContent = `code=${event.code} reason=${event.reason || '-'}`;
         state.ws = null;
         state.connectedAt = 0;
-        log('WARN', 'websocket closed', { code: event.code, reason: event.reason });
+        updateSimulatorButtons();
+        log('WARN', 'WebSocket 已关闭', { code: event.code, reason: event.reason });
       };
 
       state.ws.onerror = () => {
-        setStatus('WebSocket error', 'err');
-        log('ERROR', 'websocket error');
+        setStatus('WebSocket 错误', 'err');
+        log('ERROR', 'WebSocket 错误');
       };
 
       state.ws.onmessage = async event => {
@@ -1081,8 +1394,8 @@
           try {
             handleJsonMessage(JSON.parse(event.data));
           } catch {
-            els.lastMessage.textContent = 'text';
-            log('TEXT', 'message', event.data);
+            els.lastMessage.textContent = '文本';
+            log('TEXT', '文本消息', event.data);
           }
           return;
         }
@@ -1092,7 +1405,7 @@
           const receivedAt = performance.now();
           const frames = splitAudioBatch(arrayBuffer);
           if (frames.length > 1) {
-            log('AUDIO', 'browser split binary batch', {
+            log('AUDIO', '浏览器拆分二进制批量帧', {
               frames: frames.length,
               bytes: arrayBuffer.byteLength
             });
@@ -1103,8 +1416,8 @@
         } catch (err) {
           state.invalidFrames += 1;
           els.invalidFrames.textContent = state.invalidFrames;
-          els.lastMessage.textContent = 'invalid binary';
-          log('ERROR', 'audio frame error', err.message);
+          els.lastMessage.textContent = '无效二进制';
+          log('ERROR', '音频帧错误', err.message);
         }
       };
     }
@@ -1112,35 +1425,49 @@
     els.unlockAudio.onclick = async () => {
       try {
         await ensureAudio();
-        log('INFO', 'audio unlocked', {
+        log('INFO', '音频已解锁', {
           state: state.audioContext.state,
           sample_rate: state.audioContext.sampleRate
         });
       } catch (err) {
-        log('ERROR', 'audio unlock failed', err.message);
+        log('ERROR', '音频解锁失败', err.message);
       }
     };
 
     els.connect.onclick = connect;
     els.disconnect.onclick = () => {
       if (state.ws) {
-        state.ws.close(1000, 'browser disconnect');
+        state.ws.close(1000, '浏览器断开');
       }
     };
     els.sendPing.onclick = () => {
-      if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
+      if (!wsOpen()) {
         return;
       }
       const payload = { type: 'ping' };
       state.ws.send(JSON.stringify(payload));
-      log('KEEPALIVE', 'ping sent', payload);
+      log('KEEPALIVE', '已发送 ping', payload);
+    };
+    els.applySimIdentity.onclick = () => {
+      els.callsign.value = 'ESP32-SIM';
+      els.deviceId.value = els.simDeviceHint.value || 'browser-esp32-sim';
+      els.fwVersion.value = 'esp32-sim-browser';
+      log('ESP32_SIM', '已套用模拟终端身份', {
+        callsign: els.callsign.value,
+        device_id: els.deviceId.value,
+        fw_version: els.fwVersion.value
+      });
+    };
+    els.simStart.onclick = requestSimulatorStart;
+    els.simStop.onclick = () => {
+      stopSimulator(true);
     };
     els.clearLog.onclick = () => {
       els.log.textContent = '';
     };
     els.copyLog.onclick = async () => {
       await navigator.clipboard.writeText(els.log.textContent);
-      log('INFO', 'log copied');
+      log('INFO', '日志已复制');
     };
 
     els.pageVersion.textContent = pageBuild.version;
@@ -1148,7 +1475,7 @@
     els.serverRuntimeVersion.textContent = pageBuild.serverRuntimeVersion;
     els.serverRuntimeModifiedAt.textContent = pageBuild.serverRuntimeModifiedAt;
     els.audioParserVersion.textContent = pageBuild.audioParserVersion;
-    log('INFO', 'test page build', pageBuild);
+    log('INFO', '测试页构建信息', pageBuild);
     refreshServerStatus();
     resetCounters();
     startTimer();
